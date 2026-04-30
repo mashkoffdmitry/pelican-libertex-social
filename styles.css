@@ -78,11 +78,10 @@ header {
 .logo-tile {
   display:flex; align-items:center; justify-content:center;
   width:44px; height:44px; flex:none;
-  background:linear-gradient(135deg, #ff9c6e 0%, #ef7c46 60%, #ff6633 100%);
-  border-radius:10px; padding:8px;
+  border-radius:10px; overflow:hidden;
   box-shadow: 0 2px 6px rgba(239,124,70,.25);
 }
-.logo-tile img { width:100%; height:auto; display:block; }
+.logo-tile img { width:100%; height:100%; display:block; object-fit:cover; }
 .brand-text { display:flex; flex-direction:column; line-height:1.05; }
 .brand-name { font-weight:700; font-size:14px; letter-spacing:.6px; color:var(--text); white-space:nowrap; }
 .brand-name span { color:var(--orange); }
