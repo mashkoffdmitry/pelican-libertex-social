@@ -41,14 +41,18 @@
       </div>
     </div>
     <div class="fgroup">
+      <div class="ftitle-row"><label class="ftitle">Your Investment Amount, $</label><span class="fval" id="invest-val">any</span></div>
+      <input id="invest-amount" type="number" min="50" step="50" placeholder="e.g. 5000" autocomplete="off">
+    </div>
+    <div class="fgroup">
       <div class="ftitle-row"><label class="ftitle">Return %</label><span class="fval" id="ret-val">any</span></div>
       <div class="dual-track" id="ret-track">
-        <input class="range-dual" id="ret-min" type="range" min="0" max="500" step="10" value="0">
-        <input class="range-dual" id="ret-max" type="range" min="0" max="500" step="10" value="500">
+        <input class="range-dual" id="ret-min" type="range" min="0" max="100" step="1" value="0">
+        <input class="range-dual" id="ret-max" type="range" min="0" max="100" step="1" value="100">
         <div class="bubble" id="ret-min-bubble">0%</div>
-        <div class="bubble" id="ret-max-bubble">500%</div>
+        <div class="bubble" id="ret-max-bubble">50K%+</div>
       </div>
-      <div class="scale"><span>0%</span><span>250%</span><span>500%</span></div>
+      <div class="scale"><span>0%</span><span>200%</span><span>50K%+</span></div>
     </div>
     <div class="fgroup">
       <div class="ftitle-row"><label class="ftitle">Max Drawdown ≤</label><span class="fval" id="dd-max-val">any</span></div>

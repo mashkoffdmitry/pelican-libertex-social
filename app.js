@@ -503,6 +503,11 @@ function bindUI() {
   const fmtAUM = v => v >= 1e6 ? '$' + (v/1e6).toFixed(2) + 'M' : (v >= 1e3 ? '$' + Math.round(v/1e3) + 'K' : '$' + Math.round(v));
   // Balance uses a log-scale slider: raw 1..100 → $10..$10M; raw 0 = "any" (no filter).
   const balanceFromRaw = v => v <= 0 ? 0 : Math.round(Math.pow(10, 1 + (v - 1) / 99 * 6));
+  // Inverse: $X → slider raw position (1..100). Used by Investment Amount input.
+  const rawFromBalance = b => b <= 0 ? 0 : Math.max(1, Math.min(100, Math.round(1 + (Math.log10(b) - 1) * 99 / 6)));
+  // Return % uses a log-scale slider: raw 1..100 → 1%..50000%; raw 0 = "any" (no min); raw 100 = "any" (no max).
+  const returnFromRaw = v => v <= 0 ? 0 : Math.round(Math.pow(10, (v - 1) / 99 * 4.7));
+  const fmtRetMag = v => v >= 1000 ? (v/1000).toFixed(1).replace(/\.0$/,'') + 'K%' : Math.round(v) + '%';
   const SLIDERS = {
     'dd-max':       { key:'ddMax',      parse: v => v >= 100 ? null : v,
                                           fmt: v => '≤ ' + v + '%',
@@ -595,13 +600,13 @@ function bindUI() {
       if (document.activeElement === retMinEl) { lo = hi - step; retMinEl.value = lo; }
       else { hi = lo + step; retMaxEl.value = hi; }
     }
-    f.retMin = lo <= 0 ? null : lo;
-    f.retMax = hi >= 500 ? null : hi;
+    f.retMin = lo <= 0   ? null : returnFromRaw(lo);
+    f.retMax = hi >= 100 ? null : returnFromRaw(hi);
     const valEl = $('#ret-val');
     if (f.retMin == null && f.retMax == null) { valEl.textContent = 'any'; valEl.classList.add('dim'); }
     else {
-      const a = f.retMin == null ? '0%' : (lo + '%');
-      const b = f.retMax == null ? '500%+' : (hi + '%');
+      const a = f.retMin == null ? '0%'     : fmtRetMag(returnFromRaw(lo));
+      const b = f.retMax == null ? '50K%+'  : fmtRetMag(returnFromRaw(hi));
       valEl.textContent = a + ' … ' + b;
       valEl.classList.remove('dim');
     }
@@ -612,8 +617,8 @@ function bindUI() {
     retTrack.style.setProperty('--hi', pHi + '%');
     retLoBubble.style.left = pLo + '%';
     retHiBubble.style.left = pHi + '%';
-    retLoBubble.textContent = lo + '%';
-    retHiBubble.textContent = hi + '%';
+    retLoBubble.textContent = lo <= 0   ? '0%'    : fmtRetMag(returnFromRaw(lo));
+    retHiBubble.textContent = hi >= 100 ? '50K%+' : fmtRetMag(returnFromRaw(hi));
     STATE.page = 1; scheduleRender();
   }
   function setActive(which, on) {
@@ -673,6 +678,27 @@ function bindUI() {
   balMinEl.addEventListener('blur', () => setActiveBal('lo', false));
   balMaxEl.addEventListener('blur', () => setActiveBal('hi', false));
   updateBalance();
+
+  // Investment Amount: drives Balance sliders to [$50, $amount] automatically
+  const investEl = $('#invest-amount');
+  const investValEl = $('#invest-val');
+  investEl.addEventListener('input', () => {
+    const raw = investEl.value.trim();
+    if (!raw) {
+      // empty → release Balance to "any"
+      balMinEl.value = 0;
+      balMaxEl.value = 100;
+      investValEl.textContent = 'any'; investValEl.classList.add('dim');
+    } else {
+      const amount = parseFloat(raw);
+      if (!Number.isFinite(amount) || amount < 50) return;  // ignore < $50 per spec
+      balMinEl.value = rawFromBalance(50);
+      balMaxEl.value = rawFromBalance(amount);
+      investValEl.textContent = '$' + Math.round(amount).toLocaleString('en-US');
+      investValEl.classList.remove('dim');
+    }
+    balMaxEl.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   $('#sort').addEventListener('change', e => { STATE.sort = e.target.value; STATE.page = 1; scheduleRender(); });
 
@@ -750,7 +776,7 @@ function bindUI() {
     f.risk.clear(); document.querySelectorAll('#risk-chips .chip').forEach(c=>c.classList.remove('on'));
     // reset sliders to their "off" positions and re-trigger their handlers via 'input' event
     const defaults = {
-      'ret-min': '0', 'ret-max': '500',
+      'ret-min': '0', 'ret-max': '100',
       'balance-min': '0', 'balance-max': '100',
       'dd-max': '100', 'aum-min': '0', 'copiers-min': '0',
       'age-min': '0', 'trades-min': '0', 'winrate-min': '0', 'fee-max': '100',
@@ -760,6 +786,10 @@ function bindUI() {
       if (!el) continue;
       el.value = v;
       el.dispatchEvent(new Event('input', { bubbles:true }));
+    }
+    if ($('#invest-amount')) {
+      $('#invest-amount').value = '';
+      $('#invest-amount').dispatchEvent(new Event('input', { bubbles:true }));
     }
     f.search = ''; $('#search').value = '';
     STATE.page = 1; scheduleRender();
