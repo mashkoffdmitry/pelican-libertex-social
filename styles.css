@@ -644,13 +644,42 @@ html[data-theme="light"] .trade { background:rgba(0,0,0,.02); }
   .details {
     grid-template-columns: repeat(2, 1fr);
     gap:10px;
-    padding:10px 14px 16px;
+    padding:14px 14px 18px;
   }
   .details .field.markets { grid-column:1 / -1; }
   .details .value { font-size:14px; }
   /* Trades buttons go to their own full-width row on mobile */
   .details .trades-buttons { grid-column:1 / -1; padding:6px 0 0; }
   .details .trades-buttons .trades-toggle { padding:10px 12px; font-size:12.5px; }
+
+  /* Visually pair the expanded row with its details so it's obvious which card is open.
+     - The open row gets a subtle highlight (lifts off the rest of the list)
+     - The details panel sits noticeably tinted right below it
+     - Round only the outer corners so they read as one connected block
+     - Subtle drop shadow groups them and separates from the next card */
+  .row.open {
+    background:rgba(255,255,255,.05);
+    border-radius:10px 10px 0 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .row.open + .details {
+    background:rgba(255,255,255,.08);
+    border-radius:0 0 10px 10px;
+    margin:0 0 10px;
+    box-shadow:0 6px 16px rgba(0,0,0,.22);
+  }
+  /* Stat cards inside the open row pop a touch more so they don't blend with the new bg */
+  .row.open > .c-num { background:rgba(255,255,255,.05); }
+
+  html[data-theme="light"] .row.open {
+    background:rgba(0,0,0,.03);
+    border-bottom-color:rgba(0,0,0,.06);
+  }
+  html[data-theme="light"] .row.open + .details {
+    background:rgba(0,0,0,.05);
+    box-shadow:0 6px 16px rgba(20,30,20,.10);
+  }
+  html[data-theme="light"] .row.open > .c-num { background:rgba(0,0,0,.04); }
 
   /* Pager: smaller buttons, hide goto on tiny screens */
   .pager { gap:4px; margin:14px 0 40px; }
