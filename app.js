@@ -169,10 +169,13 @@ function sparkline(history, w=140, h=34) {
   const zeroY = py(0);
   const area = `M ${pts[0]} ` + pts.slice(1).map(p => `L ${p}`).join(' ') + ` L ${px(tMax).toFixed(1)},${zeroY.toFixed(1)} L ${px(tMin).toFixed(1)},${zeroY.toFixed(1)} Z`;
   const line = `M ${pts.join(' L ')}`;
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    <line x1="0" x2="${w}" y1="${zeroY}" y2="${zeroY}" stroke="var(--grid-line)" stroke-dasharray="2 3" stroke-width="1"/>
+  // preserveAspectRatio="none" lets the SVG stretch horizontally when CSS sets width:100%
+  // (mobile stretches the curve across the full card width; on desktop the explicit width
+  // attribute matches the viewBox so this is a no-op).
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" vector-effect="non-scaling-stroke">
+    <line x1="0" x2="${w}" y1="${zeroY}" y2="${zeroY}" stroke="var(--grid-line)" stroke-dasharray="2 3" stroke-width="1" vector-effect="non-scaling-stroke"/>
     <path d="${area}" fill="${fill}" stroke="none"/>
-    <path d="${line}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${line}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 

@@ -611,9 +611,9 @@ html[data-theme="light"] .trade { background:rgba(0,0,0,.02); }
   .nm .title { font-size:15px; }
   .nm .by { font-size:12px; }
 
-  /* Sparkline full width */
+  /* Sparkline full width — stretches to card edges via preserveAspectRatio="none" on the SVG */
   .row .c-spark { grid-column:1 / -1; }
-  .row .c-spark svg { width:100%; height:48px; display:block; }
+  .row .c-spark svg { width:100%; height:72px; display:block; }
 
   /* Numeric stats: grid 2-col with mini labels */
   .row > .c-num {
