@@ -330,9 +330,13 @@ function rowHtml(s) {
     <div class="field"><div class="label">Trades total</div><div class="value">${fmtNum(s.TradesTotal)}</div></div>
     <div class="field"><div class="label">Yearly profit</div><div class="value">${fmtMoneyFull(s.YearlyProfit)}</div></div>
     <div class="field"><div class="label">Currency</div><div class="value">${escapeHtml(s.Currency || '—')}</div></div>
+    <div class="trades-buttons">
+      ${tradesButton(s, 'open')}
+      ${tradesButton(s, 'closed')}
+    </div>
     <div class="field markets"><div class="label">Traded markets</div><div class="value markets-list">${marketsHtml}</div></div>
-    ${tradesSection(s, 'open')}
-    ${tradesSection(s, 'closed')}
+    ${tradesList(s, 'open')}
+    ${tradesList(s, 'closed')}
   </div>`;
 
   return headRow + det;
@@ -362,36 +366,41 @@ function tradeRowHtml(t, kind) {
   </div>`;
 }
 
-function tradesSection(s, kind) {
+function tradesButton(s, kind) {
   const title       = kind === 'open' ? 'Open Trades' : 'Trade History';
   const dataKey     = kind === 'open' ? '_openTrades'   : '_closedTrades';
-  const loadingKey  = kind === 'open' ? '_openLoading'  : '_closedLoading';
   const expandedKey = kind === 'open' ? '_openExpanded' : '_closedExpanded';
   const items = s[dataKey];
   const isExpanded = !!s[expandedKey];
   const count = Array.isArray(items) ? items.length : null;
+  return `<button class="trades-toggle${isExpanded ? ' open' : ''}" data-trades-toggle="${kind}" type="button" aria-expanded="${isExpanded}">
+    <span class="trades-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+    <span class="trades-title">${title}</span>${count != null ? `<span class="trades-count">${count}</span>` : ''}
+  </button>`;
+}
 
-  let body = '';
-  if (isExpanded) {
-    if (s[loadingKey]) {
-      body = '<div class="dim trades-empty"><span class="spinner"></span>loading…</div>';
-    } else if (!Array.isArray(items)) {
-      body = '<div class="dim trades-empty">no data</div>';
-    } else if (items.length === 0) {
-      body = '<div class="dim trades-empty">' +
-        (kind === 'open' ? 'no open positions' : 'no closed signals in the last 30 days') +
-        '</div>';
-    } else {
-      body = items.map(t => tradeRowHtml(t, kind)).join('');
-    }
+function tradesList(s, kind) {
+  const expandedKey = kind === 'open' ? '_openExpanded' : '_closedExpanded';
+  if (!s[expandedKey]) return '';
+  const dataKey    = kind === 'open' ? '_openTrades'  : '_closedTrades';
+  const loadingKey = kind === 'open' ? '_openLoading' : '_closedLoading';
+  const title      = kind === 'open' ? 'Open Trades' : 'Trade History';
+  const items = s[dataKey];
+  let body;
+  if (s[loadingKey]) {
+    body = '<div class="dim trades-empty"><span class="spinner"></span>loading…</div>';
+  } else if (!Array.isArray(items)) {
+    body = '<div class="dim trades-empty">no data</div>';
+  } else if (items.length === 0) {
+    body = '<div class="dim trades-empty">' +
+      (kind === 'open' ? 'no open positions' : 'no closed signals in the last 30 days') +
+      '</div>';
+  } else {
+    body = items.map(t => tradeRowHtml(t, kind)).join('');
   }
-
-  return `<div class="field trades-block">
-    <button class="trades-toggle${isExpanded ? ' open' : ''}" data-trades-toggle="${kind}" type="button" aria-expanded="${isExpanded}">
-      <span class="trades-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
-      <span class="trades-title">${title}</span>${count != null ? `<span class="trades-count">${count}</span>` : ''}
-    </button>
-    ${isExpanded ? `<div class="trades-list">${body}</div>` : ''}
+  return `<div class="trades-list-block trades-list-block--${kind}">
+    <div class="trades-list-title">${title}</div>
+    <div class="trades-list">${body}</div>
   </div>`;
 }
 

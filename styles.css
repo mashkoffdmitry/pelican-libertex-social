@@ -387,12 +387,25 @@ section#list-wrap { min-width:0; }
 }
 .market-count { color:var(--muted); font-size:11px; font-weight:500; font-variant-numeric:tabular-nums; }
 
-/* Trades sections inside the expanded details panel */
-.details .field.trades-block {
+/* Buttons row: lives next to Currency in the details grid (default desktop = repeat(6,1fr) → span 2) */
+.details .trades-buttons {
+  grid-column: span 2;
+  display:flex; gap:8px; flex-wrap:wrap;
+  align-self:end; padding:10px 0;
+}
+.details .trades-buttons .trades-toggle { flex:1 1 auto; justify-content:center; }
+
+/* Expanded list goes full-width below Markets */
+.details .trades-list-block {
   grid-column:1 / -1;
   padding-top:14px; margin-top:4px;
   border-top:1px dashed var(--line);
 }
+.trades-list-title {
+  font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;
+  color:var(--muted); margin-bottom:8px;
+}
+
 /* Toggle button: Open Trades / Trade History — orange-tinted glass pill */
 .trades-toggle {
   display:inline-flex; align-items:center; gap:8px;
@@ -635,6 +648,9 @@ html[data-theme="light"] .trade { background:rgba(0,0,0,.02); }
   }
   .details .field.markets { grid-column:1 / -1; }
   .details .value { font-size:14px; }
+  /* Trades buttons go to their own full-width row on mobile */
+  .details .trades-buttons { grid-column:1 / -1; padding:6px 0 0; }
+  .details .trades-buttons .trades-toggle { padding:10px 12px; font-size:12.5px; }
 
   /* Pager: smaller buttons, hide goto on tiny screens */
   .pager { gap:4px; margin:14px 0 40px; }
