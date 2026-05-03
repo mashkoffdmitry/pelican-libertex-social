@@ -363,29 +363,35 @@ function tradeRowHtml(t, kind) {
 }
 
 function tradesSection(s, kind) {
-  const title = kind === 'open' ? 'Open Trades' : 'Trade History';
-  const dataKey = kind === 'open' ? '_openTrades' : '_closedTrades';
-  const loadingKey = kind === 'open' ? '_openLoading' : '_closedLoading';
-  const doneKey = kind === 'open' ? '_openDone' : '_closedDone';
+  const title       = kind === 'open' ? 'Open Trades' : 'Trade History';
+  const dataKey     = kind === 'open' ? '_openTrades'   : '_closedTrades';
+  const loadingKey  = kind === 'open' ? '_openLoading'  : '_closedLoading';
+  const expandedKey = kind === 'open' ? '_openExpanded' : '_closedExpanded';
   const items = s[dataKey];
+  const isExpanded = !!s[expandedKey];
+  const count = Array.isArray(items) ? items.length : null;
 
   let body = '';
-  if (!Array.isArray(items)) {
-    body = s[loadingKey]
-      ? '<div class="dim trades-empty"><span class="spinner"></span>loading…</div>'
-      : '<div class="dim trades-empty">expand a row to load</div>';
-  } else if (items.length === 0) {
-    body = '<div class="dim trades-empty">' +
-      (kind === 'open' ? 'no open positions' : 'no closed signals in the last 30 days') +
-      '</div>';
-  } else {
-    body = items.map(t => tradeRowHtml(t, kind)).join('');
+  if (isExpanded) {
+    if (s[loadingKey]) {
+      body = '<div class="dim trades-empty"><span class="spinner"></span>loading…</div>';
+    } else if (!Array.isArray(items)) {
+      body = '<div class="dim trades-empty">no data</div>';
+    } else if (items.length === 0) {
+      body = '<div class="dim trades-empty">' +
+        (kind === 'open' ? 'no open positions' : 'no closed signals in the last 30 days') +
+        '</div>';
+    } else {
+      body = items.map(t => tradeRowHtml(t, kind)).join('');
+    }
   }
 
-  const count = Array.isArray(items) ? String(items.length) : '';
   return `<div class="field trades-block">
-    <div class="label">${title}${count ? ' · ' + count : ''}</div>
-    <div class="trades-list">${body}</div>
+    <button class="trades-toggle${isExpanded ? ' open' : ''}" data-trades-toggle="${kind}" type="button" aria-expanded="${isExpanded}">
+      <span class="trades-chev" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+      <span class="trades-title">${title}</span>${count != null ? `<span class="trades-count">${count}</span>` : ''}
+    </button>
+    ${isExpanded ? `<div class="trades-list">${body}</div>` : ''}
   </div>`;
 }
 
@@ -816,6 +822,23 @@ function bindUI() {
   list.addEventListener('click', e => {
     if (e.target.closest('[data-link]')) return; // let the Signal link <a> open normally
     if (e.target.closest('.trades-list')) return; // don't collapse the row when scrolling/clicking trades
+    // Trades section toggle button (Open Trades / Trade History) — fetches lazily on first open
+    const toggleBtn = e.target.closest('[data-trades-toggle]');
+    if (toggleBtn) {
+      e.stopPropagation();
+      const kind = toggleBtn.dataset.tradesToggle;
+      const row = toggleBtn.closest('.details')?.previousElementSibling;
+      const id = Number(row?.dataset.id);
+      const s = STATE.byId.get(id);
+      if (!s) return;
+      const expandedKey = kind === 'open' ? '_openExpanded' : '_closedExpanded';
+      s[expandedKey] = !s[expandedKey];
+      if (s[expandedKey] && !Array.isArray(s[kind === 'open' ? '_openTrades' : '_closedTrades'])) {
+        loadTrades(s, kind);
+      }
+      scheduleRender();
+      return;
+    }
     const row = e.target.closest('.row[data-id]');
     if (!row) return;
     const id = Number(row.dataset.id);
@@ -823,17 +846,13 @@ function bindUI() {
     else {
       STATE.expanded.add(id);
       const s = STATE.byId.get(id);
-      if (s) {
-        if (!Array.isArray(s.Markets) && !s._marketsLoading) {
-          s._marketsLoading = true;
-          fetch('/api/strategies/' + id + '/stats').then(r => r.json()).then(j => {
-            const arr = j.Trades?.Inception?.Markets || [];
-            s.Markets = arr.slice(0, 12).map(m => ({ n: m.MarketName, c: m.Count }));
-          }).catch(() => { s.Markets = []; })
-            .finally(() => { s._marketsLoading = false; scheduleRender(); });
-        }
-        if (!Array.isArray(s._openTrades) && !s._openLoading)   loadTrades(s, 'open');
-        if (!Array.isArray(s._closedTrades) && !s._closedLoading) loadTrades(s, 'closed');
+      if (s && !Array.isArray(s.Markets) && !s._marketsLoading) {
+        s._marketsLoading = true;
+        fetch('/api/strategies/' + id + '/stats').then(r => r.json()).then(j => {
+          const arr = j.Trades?.Inception?.Markets || [];
+          s.Markets = arr.slice(0, 12).map(m => ({ n: m.MarketName, c: m.Count }));
+        }).catch(() => { s.Markets = []; })
+          .finally(() => { s._marketsLoading = false; scheduleRender(); });
       }
     }
     scheduleRender();
