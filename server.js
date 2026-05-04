@@ -206,33 +206,36 @@ function compactStrategy(meta, stats, base) {
   const hist = inc.History || [];
   const stride = hist.length > 60 ? Math.ceil(hist.length / 60) : 1;
   const trimmed = hist.filter((_, i) => i % stride === 0 || i === hist.length - 1);
+  // Fallback chain: today's fresh fetch → previous catalog value → null. So a transient
+  // upstream blip during the daily rebuild keeps yesterday's data instead of nuking the row.
   return {
     Id: base.Id,
     Name: meta?.Name ?? base.Name ?? null,
     ImageUploaded: meta?.ImageUploaded ?? base.ImageUploaded ?? null,
     Profile: meta?.Profile || base.Profile || null,
-    NumCopiers: meta?.NumCopiers ?? null,
-    Fee: meta?.Fee ?? null,
-    RiskProfile: meta?.RiskProfile ?? null,
-    IsSimulated: meta?.IsSimulated ?? false,
-    IsEnabled: meta?.IsEnabled ?? null,
-    Inception: stats?.Inception ?? null,
-    Currency: stats?.CurrencyCode ?? null,
-    Return: inc.UnrealisedReturn != null ? inc.UnrealisedReturn * 100 : (inc.RealisedReturn != null ? inc.RealisedReturn * 100 : null),
-    MaxDD: inc.MaxDrawdown != null ? inc.MaxDrawdown * 100 : null,
-    RealisedPnl: inc.RealisedPnl ?? null,
-    UnrealisedPnl: inc.UnrealisedPnl ?? null,
-    History: trimmed,
-    TradesTotal: tr.Total ?? 0,
-    Wins: tr.Wins ?? 0,
-    Losses: tr.Losses ?? 0,
-    Markets: Array.isArray(tr.Markets) ? tr.Markets.slice(0, 12).map(m => ({ n: m.MarketName, c: m.Count })) : [],
-    AccountBalance: stats?.Status?.Balance ?? null,
-    CopiersAUM: stats?.CopiersBalance?.Balance ?? null,
-    MonthlyProfit: stats?.CopiersProfit?.Month ?? null,
-    YearlyProfit: stats?.CopiersProfit?.Year ?? null,
-    _stats: !!stats,
-    _meta:  !!meta,
+    NumCopiers: meta?.NumCopiers ?? base.NumCopiers ?? null,
+    Fee: meta?.Fee ?? base.Fee ?? null,
+    RiskProfile: meta?.RiskProfile ?? base.RiskProfile ?? null,
+    IsSimulated: meta?.IsSimulated ?? base.IsSimulated ?? false,
+    IsEnabled: meta?.IsEnabled ?? base.IsEnabled ?? null,
+    Inception: stats?.Inception ?? base.Inception ?? null,
+    Currency: stats?.CurrencyCode ?? base.Currency ?? null,
+    Return: inc.UnrealisedReturn != null ? inc.UnrealisedReturn * 100 : (inc.RealisedReturn != null ? inc.RealisedReturn * 100 : (base.Return ?? null)),
+    MaxDD: inc.MaxDrawdown != null ? inc.MaxDrawdown * 100 : (base.MaxDD ?? null),
+    RealisedPnl: inc.RealisedPnl ?? base.RealisedPnl ?? null,
+    UnrealisedPnl: inc.UnrealisedPnl ?? base.UnrealisedPnl ?? null,
+    History: trimmed.length ? trimmed : (Array.isArray(base.History) ? base.History : []),
+    TradesTotal: tr.Total ?? base.TradesTotal ?? 0,
+    Wins: tr.Wins ?? base.Wins ?? 0,
+    Losses: tr.Losses ?? base.Losses ?? 0,
+    Markets: Array.isArray(tr.Markets) ? tr.Markets.slice(0, 12).map(m => ({ n: m.MarketName, c: m.Count }))
+             : (Array.isArray(base.Markets) ? base.Markets : []),
+    AccountBalance: stats?.Status?.Balance ?? base.AccountBalance ?? null,
+    CopiersAUM: stats?.CopiersBalance?.Balance ?? base.CopiersAUM ?? null,
+    MonthlyProfit: stats?.CopiersProfit?.Month ?? base.MonthlyProfit ?? null,
+    YearlyProfit: stats?.CopiersProfit?.Year ?? base.YearlyProfit ?? null,
+    _stats: !!stats || !!base._stats,
+    _meta:  !!meta  || !!base._meta,
   };
 }
 
@@ -242,6 +245,12 @@ async function buildFull(token) {
 
   // Get meta-equivalent (NumCopiers, Fee, RiskProfile) from /api/discover groups for known top strategies
   const discoverMeta = await collectDiscoverMeta(token);
+
+  // Seed base with the previous catalog so when today's fetch fails (transient 429/timeout/etc.)
+  // compactStrategy can fall back to yesterday's values rather than wiping the row to nulls.
+  const prev = loadCatalogFromDisk();
+  const prevById = new Map();
+  if (prev?.items) for (const it of prev.items) prevById.set(it.Id, it);
 
   // Two-tier priority for build order:
   //   1) by Return (lower _returnRank from /api/discover/{Global,Return*} = higher priority)
@@ -254,14 +263,18 @@ async function buildFull(token) {
     return cb - ca;
   });
 
-  const out = new Array(base.length);
+  // Replace each base entry with its previous-catalog version so the entire fallback chain
+  // works (Return, Markets, etc.). If we have no prior data, keep the discover stub.
+  const baseWithPrev = base.map(b => ({ ...(prevById.get(b.Id) || {}), ...b }));
+
+  const out = new Array(baseWithPrev.length);
   const concurrency = 6;
   let cursor = 0;
   let statsErr = 0, statsNull = 0, fetched = 0;
 
-  // pre-fill output with partial entries so the partial cache is immediately usable
-  for (let i = 0; i < base.length; i++) {
-    out[i] = compactStrategy(discoverMeta.get(base[i].Id) || null, null, base[i]);
+  // pre-fill output with partial entries (uses prev fallback already) so the partial cache is immediately usable
+  for (let i = 0; i < baseWithPrev.length; i++) {
+    out[i] = compactStrategy(discoverMeta.get(baseWithPrev[i].Id) || null, null, baseWithPrev[i]);
   }
   fullCache.partial = out;
 
@@ -269,8 +282,8 @@ async function buildFull(token) {
   async function worker() {
     while (true) {
       const idx = cursor++;
-      if (idx >= base.length) return;
-      const b = base[idx];
+      if (idx >= baseWithPrev.length) return;
+      const b = baseWithPrev[idx];
       const [metaR, statsR] = await Promise.allSettled([
         upstreamGetRetry('/api/strategies/' + b.Id, token),
         upstreamGetRetry('/api/strategies/' + b.Id + '/stats', token),
@@ -287,6 +300,40 @@ async function buildFull(token) {
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
   console.log(`[full] fetched=${fetched} stats-null=${statsNull} stats-err=${statsErr} meta-err=${metaErr}`);
+
+  // Final retry pass: anything that ended without meta AND without prior data → try once more
+  // with longer cool-down. This catches the "first build for new strategy + transient blip" case.
+  const stillEmpty = [];
+  for (let i = 0; i < out.length; i++) {
+    if (!out[i]._meta && !out[i]._stats) stillEmpty.push(i);
+  }
+  if (stillEmpty.length) {
+    console.log(`[full] final retry pass on ${stillEmpty.length} unenriched`);
+    let cur2 = 0, fixed = 0;
+    async function retryWorker() {
+      while (true) {
+        const j = cur2++;
+        if (j >= stillEmpty.length) return;
+        const idx = stillEmpty[j];
+        const b = baseWithPrev[idx];
+        // small spacing per request to dodge bursty rate limits
+        await new Promise(r => setTimeout(r, 50 + Math.random() * 150));
+        const [metaR, statsR] = await Promise.allSettled([
+          upstreamGetRetry('/api/strategies/' + b.Id, token, 6),
+          upstreamGetRetry('/api/strategies/' + b.Id + '/stats', token, 6),
+        ]);
+        const meta  = metaR.status  === 'fulfilled' ? metaR.value  : null;
+        const stats = statsR.status === 'fulfilled' ? statsR.value : null;
+        if (meta || stats) {
+          out[idx] = compactStrategy(meta || discoverMeta.get(b.Id) || null, stats, b);
+          fixed++;
+        }
+      }
+    }
+    // half the concurrency for the retry pass to be gentle
+    await Promise.all(Array.from({ length: Math.max(1, Math.floor(concurrency / 2)) }, retryWorker));
+    console.log(`[full] final retry recovered ${fixed} of ${stillEmpty.length}`);
+  }
   return out;
 }
 
