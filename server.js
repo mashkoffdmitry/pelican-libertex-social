@@ -3,6 +3,23 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const zlib = require('zlib');
+
+// Gzip helper: respect client's Accept-Encoding, only compress text-y payloads
+// (JSON / HTML / CSS / JS / SVG). PNG/JPG/WebP/etc are already compressed.
+function sendCompressed(req, res, body, status, headers) {
+  const ae = String(req.headers['accept-encoding'] || '');
+  const ctype = String(headers['Content-Type'] || headers['content-type'] || '');
+  const compressible = /^(application\/json|text\/|image\/svg\+xml|application\/javascript)/.test(ctype);
+  if (compressible && /\bgzip\b/.test(ae) && body && body.length > 1024) {
+    const gz = zlib.gzipSync(body);
+    res.writeHead(status, { ...headers, 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'Content-Length': gz.length });
+    res.end(gz);
+    return;
+  }
+  res.writeHead(status, headers);
+  res.end(body);
+}
 
 const PORT = parseInt(process.env.PORT || '8787', 10);
 const ROOT = __dirname;
@@ -632,14 +649,14 @@ const server = http.createServer((req, res) => {
       const src = fullCache.items || fullCache.partial;
       if (src) {
         const out = onlyEnabled(src);
-        res.writeHead(200, {
+        sendCompressed(req, res, Buffer.from(JSON.stringify(out)), 200, {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=300',  // browsers can re-use for 5 min — saves ngrok bytes
           'X-Catalog-Building': fullCache.building ? '1' : '0',
           'X-Catalog-Size': String(out.length),
           'X-Catalog-Loaded': String(fullCache.progress.loaded),
         });
-        res.end(JSON.stringify(out));
         // touch getFull so a stale-while-revalidate kick happens if needed
         getFull(env.ACCESS_TOKEN).catch(()=>{});
         return;
@@ -647,14 +664,14 @@ const server = http.createServer((req, res) => {
     }
     getFull(env.ACCESS_TOKEN).then(items => {
       const out = onlyEnabled(items);
-      res.writeHead(200, {
+      sendCompressed(req, res, Buffer.from(JSON.stringify(out)), 200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=300',
         'X-Catalog-Built-At': String(fullCache.at),
         'X-Catalog-Size': String(out.length),
         'X-Catalog-Total-Raw': String(items.length),
       });
-      res.end(JSON.stringify(out));
     }).catch(e => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'full_failed', message: e.message }));
@@ -669,13 +686,13 @@ const server = http.createServer((req, res) => {
     const env = readEnv();
     if (!env.ACCESS_TOKEN) { res.writeHead(503); return res.end('no_token'); }
     getCatalog(env.ACCESS_TOKEN).then(items => {
-      res.writeHead(200, {
+      sendCompressed(req, res, Buffer.from(JSON.stringify(items)), 200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=300',
         'X-Catalog-Built-At': String(catalogCache.at),
         'X-Catalog-Size': String(items.length),
       });
-      res.end(JSON.stringify(items));
     }).catch(e => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'catalog_failed', message: e.message }));
@@ -732,7 +749,29 @@ const server = http.createServer((req, res) => {
   // never serve dotfiles
   if (path.basename(fp).startsWith('.')) { res.writeHead(404); return res.end('not found'); }
   if (fs.existsSync(fp) && fs.statSync(fp).isFile()) {
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream' });
+    const ext = path.extname(fp);
+    const ctype = MIME[ext] || 'application/octet-stream';
+    // Cache aggressively for images/fonts (immutable feel) and a day for HTML/CSS/JS
+    // (we mutate those during dev, so a hard reload picks up changes via Last-Modified).
+    const stat = fs.statSync(fp);
+    const longCache = /^\.(png|jpg|jpeg|gif|webp|ico|svg|woff2?|ttf)$/i.test(ext);
+    const cacheCtrl = longCache ? 'public, max-age=604800' : 'public, max-age=86400';
+    const headers = {
+      'Content-Type': ctype,
+      'Cache-Control': cacheCtrl,
+      'Last-Modified': stat.mtime.toUTCString(),
+    };
+    // 304 for unmodified
+    if (req.headers['if-modified-since'] && new Date(req.headers['if-modified-since']) >= stat.mtime) {
+      res.writeHead(304, headers); return res.end();
+    }
+    // gzip text-y assets in-memory (small enough — html/css/js/svg)
+    const compressible = /^(text\/|application\/(javascript|json)|image\/svg)/.test(ctype);
+    if (compressible) {
+      const body = fs.readFileSync(fp);
+      return sendCompressed(req, res, body, 200, headers);
+    }
+    res.writeHead(200, headers);
     return fs.createReadStream(fp).pipe(res);
   }
   res.writeHead(404, { 'Content-Type': 'text/plain' });
