@@ -23,7 +23,7 @@ function sendCompressed(req, res, body, status, headers) {
 
 const PORT = parseInt(process.env.PORT || '8787', 10);
 const ROOT = __dirname;
-const ENV_PATH = path.join(ROOT, '.env');
+const ENV_PATH = process.env.ENV_PATH || path.join(ROOT, '.env');
 const UPSTREAM_HOST = 'papi.copy-trade.io';
 
 const MIME = {

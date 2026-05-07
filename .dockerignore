@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.example
+.chrome-profile
+.catalog.json
+node_modules
+DEPLOY.md
+README*.md
+install.ps1
+start.ps1
+patch-*.js
+vue/node_modules
+vue/dist
+vue/.vite
+*.log
