@@ -1,0 +1,8 @@
+demo
+src
+node_modules
+*.test.ts
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
+.gitignore

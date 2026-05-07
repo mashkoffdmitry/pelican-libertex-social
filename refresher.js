@@ -1,16 +1,25 @@
-// Long-running headless Chrome that keeps a libertex.copy-trade.io tab open.
-// Logs in once on startup (creds via env), then refreshes the access token
-// from sessionStorage on a schedule and writes it to .env via fs.
+// Token refresher — API-only OIDC client (no Chromium / no Puppeteer).
+//
+// Replaces the previous puppeteer-core implementation. Walks the
+// authorization_code+PKCE flow against identity.copy-trade.io directly with
+// fetch + tough-cookie (see oidc-client.js for the full request/response
+// contract).
+//
+// Renewal strategy:
+//   1. If we have a refresh_token (scope=offline_access was granted), use the
+//      refresh_token grant — cheapest, no cookie state required.
+//   2. Otherwise, attempt silent renew via /connect/authorize?prompt=none
+//      against the cookie jar that survived from the previous login.
+//   3. On either failing with session_expired, do a full email/password login.
 
 'use strict';
 
 const path = require('path');
 const fs = require('fs');
-const puppeteer = require('puppeteer-core');
+const { loginAndGetToken, refreshWithToken, silentRenew, CookieJar } = require('./oidc-client');
 
-// load .env into process.env (no dependency on dotenv)
 (function loadEnv() {
-  const p = path.join(__dirname, '.env');
+  const p = process.env.ENV_PATH || path.join(__dirname, '.env');
   if (!fs.existsSync(p)) return;
   for (const line of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -18,17 +27,16 @@ const puppeteer = require('puppeteer-core');
   }
 })();
 
-const PROFILE_DIR = path.join(__dirname, '.chrome-profile');
-const CHROME_EXE = process.env.CHROME_EXE || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const ROOT_URL = process.env.LIBERTEX_URL || 'https://libertex.copy-trade.io/';
-const STORAGE_KEY = 'oidc.user:https://identity.copy-trade.io/:libertexweb';
-const ENV_PATH = path.join(__dirname, '.env');
+const ENV_PATH = process.env.ENV_PATH || path.join(__dirname, '.env');
+const REFRESH_INTERVAL_MS = parseInt(process.env.REFRESH_MS || (45 * 60 * 1000), 10);
+const REFRESH_BEFORE_EXPIRY_S = 600;
 
-const REFRESH_INTERVAL_MS = parseInt(process.env.REFRESH_MS || (45 * 60 * 1000), 10); // 45 min
-const REFRESH_BEFORE_EXPIRY_S = 600; // refresh if < 10 min left
-
-let browser = null;
-let page = null;
+// In-memory state. The cookie jar holds the IdP session cookies after the
+// initial login, which lets us do silent renew for as long as the jar is
+// valid. The pod's filesystem is ephemeral so this state is rebuilt on every
+// container restart — that's fine; full login takes ~3-5s.
+let jar = new CookieJar();
+let lastIdToken = null;
 
 function readEnv() {
   const env = {};
@@ -39,103 +47,71 @@ function readEnv() {
   }
   return env;
 }
+
 function writeEnv(env) {
   const txt = Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n') + '\n';
   fs.writeFileSync(ENV_PATH, txt);
 }
 
-async function launch() {
-  if (!fs.existsSync(PROFILE_DIR)) fs.mkdirSync(PROFILE_DIR, { recursive: true });
-  browser = await puppeteer.launch({
-    executablePath: CHROME_EXE,
-    userDataDir: PROFILE_DIR,
-    headless: 'new',
-    args: [
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-extensions',
-      '--disable-dev-shm-usage',
-      '--no-sandbox',
-    ],
-  });
-  page = (await browser.pages())[0] || await browser.newPage();
-  console.log('[refresher] headless chrome launched');
-  process.on('exit', () => { try { browser?.close(); } catch {} });
-  process.on('SIGINT', () => { try { browser?.close(); } catch {}; process.exit(0); });
-  process.on('SIGTERM', () => { try { browser?.close(); } catch {}; process.exit(0); });
+function persist(token) {
+  const env = readEnv();
+  env.ACCESS_TOKEN = token.access_token;
+  env.EXPIRES_AT = String(token.expires_at || '');
+  env.SAVED_AT = String(Math.floor(Date.now() / 1000));
+  if (token.refresh_token) env.REFRESH_TOKEN = token.refresh_token;
+  writeEnv(env);
+  if (token.id_token) lastIdToken = token.id_token;
+  const left = (token.expires_at || 0) - Math.floor(Date.now() / 1000);
+  console.log(`[refresher] token saved, ${left}s left, refresh_token=${token.refresh_token ? 'yes' : 'no'}`);
 }
 
-async function loginIfNeeded() {
+async function fullLogin() {
   const email = process.env.LIBERTEX_EMAIL;
   const password = process.env.LIBERTEX_PASSWORD;
-  await page.goto(ROOT_URL, { waitUntil: 'networkidle2', timeout: 45000 }).catch(() => {});
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    const u = page.url();
-    if (u.includes('/Account/Login')) break;
-    const have = await page.evaluate(k => !!sessionStorage.getItem(k), STORAGE_KEY).catch(() => false);
-    if (have) return;
-  }
-  if (!page.url().includes('/Account/Login')) return;
-
   if (!email || !password) {
-    throw new Error('login required but LIBERTEX_EMAIL/LIBERTEX_PASSWORD not set');
+    throw new Error('LIBERTEX_EMAIL / LIBERTEX_PASSWORD not set');
   }
-  await page.waitForSelector('input#Email', { timeout: 10000 });
-  await page.click('input#Email', { clickCount: 3 });
-  await page.type('input#Email', email, { delay: 15 });
-  await page.click('input#Password', { clickCount: 3 });
-  await page.type('input#Password', password, { delay: 15 });
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(()=>{}),
-    page.click('button[name="button"]'),
-  ]);
-  for (let i = 0; i < 40; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    const have = await page.evaluate(k => !!sessionStorage.getItem(k), STORAGE_KEY).catch(() => false);
-    if (have) { console.log('[refresher] login OK'); return; }
-  }
-  throw new Error('login submitted but token not found');
-}
-
-async function readToken() {
-  return page.evaluate(k => {
-    const v = sessionStorage.getItem(k);
-    if (!v) return null;
-    try { const u = JSON.parse(v); return { access_token: u.access_token, expires_at: u.expires_at }; } catch { return null; }
-  }, STORAGE_KEY);
+  jar = new CookieJar();
+  const t = await loginAndGetToken({ email, password, jar });
+  persist(t);
+  return t;
 }
 
 async function refresh() {
-  // Reload to trigger SPA silent renew (uses IdP cookies still alive in this browser process)
-  try {
-    await page.reload({ waitUntil: 'networkidle2', timeout: 30000 });
-  } catch {
-    // sometimes networkidle2 hangs; fall through
-  }
-  // Wait for sessionStorage
-  let tok = null;
-  for (let i = 0; i < 40; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    tok = await readToken().catch(() => null);
-    if (tok && tok.access_token) break;
-    const url = page.url();
-    if (url.includes('/Account/Login')) {
-      // session lost — try to re-login
-      console.warn('[refresher] redirected to login during refresh, re-logging in');
-      await loginIfNeeded();
-      return refresh();
+  const env = readEnv();
+  const refreshToken = env.REFRESH_TOKEN;
+
+  // Path 1: refresh_token grant — fastest, doesn't touch cookies/login form
+  if (refreshToken) {
+    try {
+      const t = await refreshWithToken({ refreshToken });
+      persist(t);
+      return t;
+    } catch (e) {
+      if (e.code !== 'session_expired') {
+        console.warn('[refresher] refresh_token grant failed:', e.message);
+      }
+      // fall through
     }
   }
-  if (!tok) throw new Error('no token after reload');
-  const env = readEnv();
-  env.ACCESS_TOKEN = tok.access_token;
-  env.EXPIRES_AT = String(tok.expires_at || '');
-  env.SAVED_AT = String(Math.floor(Date.now() / 1000));
-  writeEnv(env);
-  const left = (tok.expires_at || 0) - Math.floor(Date.now() / 1000);
-  console.log(`[refresher] token refreshed, ${left}s left`);
-  return tok;
+
+  // Path 2: silent renew via prompt=none + the live cookie jar
+  if (lastIdToken && jar) {
+    try {
+      const t = await silentRenew({ jar, idToken: lastIdToken });
+      persist(t);
+      return t;
+    } catch (e) {
+      if (e.code !== 'session_expired') {
+        console.warn('[refresher] silent renew failed:', e.message);
+      }
+      // fall through
+    }
+  }
+
+  // Path 3: full re-login
+  console.log('[refresher] performing full login');
+  return await fullLogin();
 }
 
 async function tickIfNeeded() {
@@ -144,20 +120,24 @@ async function tickIfNeeded() {
   const exp = parseInt(env.EXPIRES_AT || '0', 10);
   const left = exp - now;
   if (left > REFRESH_BEFORE_EXPIRY_S) return;
-  try { await refresh(); }
-  catch (e) { console.error('[refresher] refresh failed:', e.message); }
+  try {
+    await refresh();
+  } catch (e) {
+    console.error('[refresher] refresh failed:', e.message);
+  }
 }
 
 async function start() {
-  await launch();
   try {
-    await loginIfNeeded();
     await refresh();
   } catch (e) {
     console.error('[refresher] startup failed:', e.message);
   }
-  setInterval(tickIfNeeded, 60_000);  // every minute, refresh if close to expiry
-  setInterval(() => refresh().catch(e => console.error('[refresher] periodic fail:', e.message)), REFRESH_INTERVAL_MS);
+  setInterval(tickIfNeeded, 60_000);
+  setInterval(
+    () => refresh().catch((e) => console.error('[refresher] periodic fail:', e.message)),
+    REFRESH_INTERVAL_MS,
+  );
 }
 
 if (require.main === module) {
