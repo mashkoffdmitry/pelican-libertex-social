@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import RiskChips from './filters/RiskChips.vue';
 import RangeSingle from './filters/RangeSingle.vue';
 import RangeDual from './filters/RangeDual.vue';
@@ -8,7 +9,7 @@ import type { RiskLevel } from '../types/strategy';
 import { fmtAUM, fmtRetMag } from '../utils/format';
 import { balanceFromRaw, returnFromRaw } from '../utils/scales';
 
-defineProps<{
+const props = defineProps<{
   filters: FiltersState;
   investAmount: number | null;
   open: boolean;
@@ -20,6 +21,46 @@ const emit = defineEmits<{
   (e: 'reset'): void;
 }>();
 
+// Dual-range sliders need raw 0..100 positions held *here*, not derived from
+// `filters.retMin/retMax` (the slider's log scale isn't trivially invertible
+// per-tick, and round-tripping reactively would jitter the handle). We keep
+// the raw positions here and only push the domain values up to the parent's
+// FiltersState. When the parent resets filters externally, the watchers below
+// snap raw positions back to the extremes.
+const retRawMin = ref<number>(0);
+const retRawMax = ref<number>(100);
+const balRawMin = ref<number>(0);
+const balRawMax = ref<number>(100);
+
+watch(retRawMin, (v) => {
+  emit('update:filters', { retMin: v <= 0 ? null : returnFromRaw(v) });
+});
+watch(retRawMax, (v) => {
+  emit('update:filters', { retMax: v >= 100 ? null : returnFromRaw(v) });
+});
+watch(balRawMin, (v) => {
+  emit('update:filters', { balanceMin: v <= 0 ? null : balanceFromRaw(v) });
+});
+watch(balRawMax, (v) => {
+  emit('update:filters', { balanceMax: v >= 100 ? null : balanceFromRaw(v) });
+});
+
+// External reset (parent's `resetFilters` or InvestAmount-clear) → snap handles.
+watch(
+  () => [props.filters.retMin, props.filters.retMax],
+  ([lo, hi]) => {
+    if (lo == null) retRawMin.value = 0;
+    if (hi == null) retRawMax.value = 100;
+  },
+);
+watch(
+  () => [props.filters.balanceMin, props.filters.balanceMax],
+  ([lo, hi]) => {
+    if (lo == null) balRawMin.value = 0;
+    if (hi == null) balRawMax.value = 100;
+  },
+);
+
 function patch(p: Partial<FiltersState>) {
   emit('update:filters', p);
 }
@@ -30,22 +71,13 @@ function setRisk(v: Set<RiskLevel>) {
 function applyInvest(range: { min: number; max: number } | null) {
   if (range == null) {
     patch({ balanceMin: null, balanceMax: null });
+    balRawMin.value = 0;
+    balRawMax.value = 100;
   } else {
-    patch({ balanceMin: balanceFromRaw(range.min), balanceMax: balanceFromRaw(range.max) });
+    balRawMin.value = range.min;
+    balRawMax.value = range.max;
+    // The watchers above will fire and propagate to filters.balanceMin/Max.
   }
-}
-
-function setRetMin(v: number | null) {
-  patch({ retMin: v == null ? null : returnFromRaw(v) });
-}
-function setRetMax(v: number | null) {
-  patch({ retMax: v == null ? null : returnFromRaw(v) });
-}
-function setBalMin(v: number | null) {
-  patch({ balanceMin: v == null ? null : balanceFromRaw(v) });
-}
-function setBalMax(v: number | null) {
-  patch({ balanceMax: v == null ? null : balanceFromRaw(v) });
 }
 </script>
 
@@ -65,14 +97,14 @@ function setBalMax(v: number | null) {
 
     <RangeDual
       label="Return %"
-      :model-value-min="null"
-      :model-value-max="null"
+      :model-value-min="retRawMin"
+      :model-value-max="retRawMax"
       :format-raw="(v) => fmtRetMag(v)"
       :raw-to-domain="(raw) => returnFromRaw(raw)"
       :scale-hints="['0%', '200%', '50K%+']"
       max-label="50K%+"
-      @update:model-value-min="setRetMin"
-      @update:model-value-max="setRetMax"
+      @update:model-value-min="(v) => (retRawMin = v ?? 0)"
+      @update:model-value-max="(v) => (retRawMax = v ?? 100)"
     />
 
     <RangeSingle
@@ -89,14 +121,14 @@ function setBalMax(v: number | null) {
 
     <RangeDual
       label="Balance"
-      :model-value-min="null"
-      :model-value-max="null"
+      :model-value-min="balRawMin"
+      :model-value-max="balRawMax"
       :format-raw="(v) => fmtAUM(v)"
       :raw-to-domain="(raw) => balanceFromRaw(raw)"
       :scale-hints="['$0', '$10K', '$10M']"
       max-label="$10M+"
-      @update:model-value-min="setBalMin"
-      @update:model-value-max="setBalMax"
+      @update:model-value-min="(v) => (balRawMin = v ?? 0)"
+      @update:model-value-max="(v) => (balRawMax = v ?? 100)"
     />
 
     <RangeSingle

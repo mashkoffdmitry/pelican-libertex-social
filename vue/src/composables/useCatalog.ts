@@ -36,7 +36,6 @@ export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogR
 
   const catalog = computed<Strategy[]>(() => Array.from(byIdRef.value.values()));
 
-  let progressTimer: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
 
   const handleError = (e: unknown) => {
@@ -144,16 +143,11 @@ export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogR
   }
 
   function start() {
-    if (progressTimer) return;
     stopped = false;
     void loadFull();
   }
   function stop() {
     stopped = true;
-    if (progressTimer) {
-      clearInterval(progressTimer);
-      progressTimer = null;
-    }
   }
   async function refresh() {
     stop();

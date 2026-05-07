@@ -151,7 +151,9 @@ async function loginAndGetToken({ email, password, jar = new CookieJar() }) {
   // at the redirect_uri host, the user is already authenticated (rare on first
   // run but happens if a long-lived idsrv cookie survives a process restart).
   if (authResp.finalLocation) {
-    const code = new URL(authResp.finalLocation).searchParams.get('code');
+    const cb = new URL(authResp.finalLocation);
+    assertState(cb, state);
+    const code = cb.searchParams.get('code');
     if (!code) throw makeError('login_failed', 'callback URL has no code');
     return await exchangeCodeForToken({ code, verifier });
   }
@@ -217,9 +219,20 @@ async function loginAndGetToken({ email, password, jar = new CookieJar() }) {
   }
 
   const callbackUrl = new URL(submitResp.finalLocation);
+  assertState(callbackUrl, state);
   const code = callbackUrl.searchParams.get('code');
   if (!code) throw makeError('login_failed', 'redirect_uri has no code parameter');
   return await exchangeCodeForToken({ code, verifier });
+}
+
+// OAuth security BCP §4.7: the client MUST verify the state value returned in
+// the redirect matches the value sent in the authorize request. Without this
+// an attacker can inject a code from a different session.
+function assertState(callbackUrl, expected) {
+  const got = callbackUrl.searchParams.get('state');
+  if (got !== expected) {
+    throw makeError('login_failed', `state mismatch: expected ${expected.slice(0, 8)}…, got ${(got || '').slice(0, 8)}…`);
+  }
 }
 
 async function exchangeCodeForToken({ code, verifier }) {
@@ -290,6 +303,7 @@ async function silentRenew({ jar, idToken }) {
     }
     throw makeError('login_failed', `silent renew error=${error}`);
   }
+  assertState(cb, state);
   const code = cb.searchParams.get('code');
   if (!code) throw makeError('login_failed', 'silent renew callback has no code');
   return await exchangeCodeForToken({ code, verifier });

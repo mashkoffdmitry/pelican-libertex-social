@@ -18,14 +18,14 @@ export function useTheme(initial: ThemeMode = 'auto'): UseThemeReturn {
     ? window.matchMedia('(prefers-color-scheme: dark)')
     : null;
 
+  // Compute resolved value only — DO NOT touch document.documentElement.
+  // The component template binds `:data-theme="resolved"` on its own root div,
+  // so theme stays scoped to the component and never collides with a host app's
+  // own theme system.
   const apply = () => {
     const m = mode.value;
-    const next: 'dark' | 'light' =
+    resolved.value =
       m === 'dark' ? 'dark' : m === 'light' ? 'light' : mq?.matches ? 'dark' : 'light';
-    resolved.value = next;
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', next);
-    }
   };
 
   const onMq = () => {

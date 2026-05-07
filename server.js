@@ -551,11 +551,19 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
 
-  // ---- /__ingest: only from localhost ----
+  // ---- /__ingest: localhost OR matching X-Ingest-Secret ----
+  // Localhost path is the in-pod fast path (refresher.js writes the token
+  // directly via fetch). The X-Ingest-Secret path is the operator-side
+  // emergency override — set INGEST_SECRET in the pod's secret_env_vars
+  // and POST from a Mac to inject a hand-grabbed token if the autonomous
+  // OIDC client gets stuck (captcha, IdP outage, etc.).
   if (u.pathname === '/__ingest' && req.method === 'POST') {
-    if (!isLocal(req)) {
+    const ingestSecret = process.env.INGEST_SECRET || '';
+    const provided = String(req.headers['x-ingest-secret'] || '');
+    const secretOk = ingestSecret.length > 0 && provided.length > 0 && provided === ingestSecret;
+    if (!isLocal(req) && !secretOk) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: 'localhost_only' }));
+      return res.end(JSON.stringify({ error: 'forbidden' }));
     }
     let body = '';
     req.on('data', c => body += c);
@@ -605,6 +613,24 @@ const server = http.createServer((req, res) => {
 </script>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     return res.end(html);
+  }
+
+  // ---- /healthz: always 200 if the process is up. For k8s liveness probe. ----
+  if (u.pathname === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // ---- /readyz: 200 only if we have a non-expired token. For k8s readiness probe. ----
+  // Without this k8s sends traffic before the refresher's first login completes,
+  // so clients see 503/no_token until the token lands.
+  if (u.pathname === '/readyz') {
+    const env = readEnv();
+    const now = Math.floor(Date.now() / 1000);
+    const exp = parseInt(env.EXPIRES_AT || '0', 10);
+    const ready = !!env.ACCESS_TOKEN && exp > now;
+    res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ready, expires_at: exp || null, seconds_left: exp ? exp - now : null }));
   }
 
   // ---- /__status (public, only TTL info, no token leakage) ----
