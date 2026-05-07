@@ -1,0 +1,5 @@
+export const PAGE_SIZE = 20;
+export const SEARCH_DEBOUNCE_MS = 350;
+export const PROGRESS_POLL_INTERVAL_MS = 2000;
+export const PARTIAL_REPAINT_INTERVAL_MS = 20000;
+export const SIGNALS_CLOSED_WINDOW_DAYS = 30;
