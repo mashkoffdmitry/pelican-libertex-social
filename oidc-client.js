@@ -105,8 +105,14 @@ async function followRedirects(jar, startUrl, options, { maxHops = 10, stopHost 
   for (let i = 0; i < maxHops; i++) {
     res = await jarFetch(jar, url, options);
     if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get('location');
+      let loc = res.headers.get('location');
       if (!loc) return { res, url };
+      // identity.copy-trade.io occasionally returns HTML-entity-encoded
+      // ampersands in Location headers (e.g. ?a=1&amp;b=2). Browsers tolerate
+      // this; URL() treats `&amp;` as part of the previous parameter's value,
+      // which breaks the next /connect/authorize/callback hop and the IdP
+      // bounces with `invalid_request`. Normalise before parsing.
+      loc = loc.replace(/&amp;/g, '&');
       const next = new URL(loc, url);
       if (stopHost && next.host === stopHost) {
         return { res, url, finalLocation: next.toString() };
