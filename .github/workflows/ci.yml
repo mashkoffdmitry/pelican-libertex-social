@@ -86,6 +86,66 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  publish-vue:
+    name: publish @mashkovd/pelican-vue to npm
+    needs: [vue]
+    # Only publish on push to main AND only when NPM_TOKEN is configured.
+    # Skips silently on forks / contributors who haven't set the secret.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vue
+    steps:
+      - name: Skip if NPM_TOKEN unset
+        id: gate
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::warning::NPM_TOKEN secret not set — skipping npm publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: vue/package-lock.json
+
+      - name: Check if version already published
+        id: check
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "@mashkovd/pelican-vue@$PKG_VERSION" version 2>/dev/null | grep -q "$PKG_VERSION"; then
+            echo "::notice::@mashkovd/pelican-vue@$PKG_VERSION already on npm — skipping"
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install & build
+        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
+        run: npm ci && npm run build
+
+      - name: Publish
+        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
+        run: |
+          echo "📦 Published @mashkovd/pelican-vue@${{ steps.check.outputs.version }} to npm" >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: deploy to mctl labs/pelican-proxy
     # Only depends on the jobs that actually run on push to main. The docker
