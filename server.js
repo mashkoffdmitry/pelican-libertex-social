@@ -187,12 +187,13 @@ async function getCatalog(token) {
   return catalogCache.building;
 }
 
-// ---- full catalog with stats+meta (full daily-refresh data for filters) ----
-// Long TTL: the daily 11:00 Kyiv scheduler is the only thing that should trigger rebuilds.
-// Avoids the 23h-TTL race that caused two concurrent buildFull's around restart time.
-const FULL_TTL_MS = 26 * 60 * 60 * 1000;
+// ---- full catalog with stats+meta ----
+// Rebuild interval controlled by CATALOG_REBUILD_INTERVAL_H (default 6).
+// TTL = interval + 2h buffer so a slow build never races with the next scheduled one.
+const REBUILD_INTERVAL_H = parseInt(process.env.CATALOG_REBUILD_INTERVAL_H) || 6;
+const FULL_TTL_MS = (REBUILD_INTERVAL_H + 2) * 60 * 60 * 1000;
 const CATALOG_FILE = path.join(ROOT, '.catalog.json');
-let fullCache = { at: 0, items: null, partial: null, building: null, progress: { loaded: 0, total: 0 } };
+let fullCache = { at: 0, items: null, partial: null, building: null, progress: { loaded: 0, total: 0 }, built_in_s: null };
 
 function saveCatalogToDisk(items) {
   try {
@@ -411,8 +412,9 @@ function getFull(token) {
     fullCache.building = (async () => {
       const t0 = Date.now();
       const items = await buildFull(token);
-      fullCache = { at: Date.now(), items, partial: fullCache.items, building: null, progress: { loaded: items.length, total: items.length } };
-      console.log(`[full] background-rebuilt ${items.length} enriched strategies in ${((Date.now()-t0)/1000).toFixed(1)}s`);
+      const built_in_s = +((Date.now()-t0)/1000).toFixed(1);
+      fullCache = { at: Date.now(), items, partial: fullCache.items, building: null, progress: { loaded: items.length, total: items.length }, built_in_s };
+      console.log(`[full] background-rebuilt ${items.length} enriched strategies in ${built_in_s}s`);
       saveCatalogToDisk(items);
       uploadCatalog(items);
       return items;
@@ -424,8 +426,9 @@ function getFull(token) {
   fullCache.building = (async () => {
     const t0 = Date.now();
     const items = await buildFull(token);
-    fullCache = { at: Date.now(), items, partial: items, building: null, progress: { loaded: items.length, total: items.length } };
-    console.log(`[full] built ${items.length} enriched strategies in ${((Date.now()-t0)/1000).toFixed(1)}s`);
+    const built_in_s = +((Date.now()-t0)/1000).toFixed(1);
+    fullCache = { at: Date.now(), items, partial: items, building: null, progress: { loaded: items.length, total: items.length }, built_in_s };
+    console.log(`[full] built ${items.length} enriched strategies in ${built_in_s}s`);
     saveCatalogToDisk(items);
     uploadCatalog(items);
     return items;
@@ -433,38 +436,14 @@ function getFull(token) {
   return fullCache.building;
 }
 
-// ---- daily scheduler: rebuild at 11:00 Europe/Kyiv ----
-let lastBuildKyivDay = null;
-function kyivNowParts() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Kyiv',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date());
-  const get = t => parts.find(p => p.type === t).value;
-  return { day: `${get('year')}-${get('month')}-${get('day')}`, h: +get('hour'), m: +get('minute') };
-}
-
-function startDailyScheduler() {
-  // mark today as already-built if disk cache is from today (Kyiv)
-  if (fullCache.items) {
-    const built = new Date(fullCache.at);
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Kyiv', year:'numeric', month:'2-digit', day:'2-digit'
-    }).formatToParts(built);
-    const get = t => parts.find(p => p.type === t).value;
-    lastBuildKyivDay = `${get('year')}-${get('month')}-${get('day')}`;
-    console.log(`[scheduler] disk cache from Kyiv day ${lastBuildKyivDay}`);
-  }
-
+// ---- interval scheduler: rebuild every CATALOG_REBUILD_INTERVAL_H hours ----
+function startScheduler() {
+  console.log(`[scheduler] rebuild every ${REBUILD_INTERVAL_H}h (FULL_TTL ${REBUILD_INTERVAL_H + 2}h)`);
   setInterval(() => {
-    const { day, h, m } = kyivNowParts();
-    if (h === 11 && m === 0 && lastBuildKyivDay !== day) {
-      lastBuildKyivDay = day;
-      console.log(`[scheduler] daily 11:00 Kyiv rebuild (${day})`);
-      // Keep yesterday's items live during the rebuild — only invalidate the timestamp
-      // so getFull picks up the stale-while-revalidate path. This way the API never
-      // returns 0 items just because a rebuild kicked off.
+    const ageMs = fullCache.at ? Date.now() - fullCache.at : Infinity;
+    const ageH = (ageMs / 3600_000).toFixed(1);
+    if (!fullCache.building && ageMs > REBUILD_INTERVAL_H * 3600_000) {
+      console.log(`[scheduler] ${REBUILD_INTERVAL_H}h interval — cache is ${ageH}h old, triggering rebuild`);
       catalogCache = { at: 0, items: null, building: null };
       fullCache.at = 0;
       fullCache.partial = fullCache.items || fullCache.partial;
@@ -474,8 +453,7 @@ function startDailyScheduler() {
         getFull(env.ACCESS_TOKEN).catch(e => console.error('[scheduler] rebuild failed:', e.message));
       }
     }
-  }, 30_000);
-  console.log('[scheduler] daily rebuild armed for 11:00 Europe/Kyiv');
+  }, 60_000);
 }
 
 // ---- env file ----
@@ -650,7 +628,8 @@ const server = http.createServer((req, res) => {
       loaded: fullCache.progress.loaded,
       total: fullCache.progress.total,
       built_at: fullCache.at || null,
-      schedule: 'daily 11:00 Europe/Kyiv',
+      built_in_s: fullCache.built_in_s || null,
+      schedule: `every ${REBUILD_INTERVAL_H}h`,
     }));
   }
 
@@ -795,7 +774,7 @@ server.listen(PORT, () => {
     console.log(`[catalog] restored ${disk.items.length} items from disk (age ${ageH}h)`);
   }
 
-  startDailyScheduler();
+  startScheduler();
 
   const env = readEnv();
   if (env.ACCESS_TOKEN) {
