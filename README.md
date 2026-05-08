@@ -1,158 +1,62 @@
 # Pelican — Libertex Social viewer
 
-A self-hosted, filterable mirror of the [Libertex Social](https://libertex.copy-trade.io/) copy-trading catalog. Browse 10,000+ strategies in one screen with sortable columns, range filters (Return %, Drawdown, Balance, Investment Amount, etc.), open trades, and 30-day trade history per strategy. Logs in to your own Libertex account, rotates the OAuth token automatically, caches the catalog daily.
+A read-only proxy + Vue 3 component for browsing the [Libertex Social](https://libertex.copy-trade.io/) copy-trading catalog. The proxy logs in to your own Libertex account, autonomously rotates the OAuth token, caches the catalog, and serves a clean REST API. The Vue 3 component renders the full UI (filters, sort, sparklines, trade panels) on top of that API.
 
-> **Disclaimer.** Unofficial. You point it at your own Libertex Social account credentials. Not affiliated with Libertex Group.
+> **Disclaimer.** Unofficial. Point at your own Libertex Social credentials. Not affiliated with Libertex Group.
 
-There are three deployment surfaces:
+## What ships
 
-1. **Self-hosted Windows VPS** — the original flow, documented end-to-end below. Headless Chrome + NSSM-managed services + ngrok tunnel. Use this if you have a Windows box.
-2. **Containerized** — `Dockerfile` + `docker run` for self-hosting on any host that runs containers. See [Container deployment](#container-deployment).
-3. **Cloud (mctl)** — autonomous in-cluster OIDC, no Chromium in the image, deployed via mctl. Operator-only; not user-facing.
-
-![preview](docs/preview.png) <!-- optional; add later if you want a screenshot in the README -->
-
----
-
-## Features
-
-- **Full catalog cached locally** — daily 11:00 (Europe/Kyiv) rebuild, served from disk so the page loads in <1 s.
-- **Live filters** — Risk, Return % (log scale), Max Drawdown, Balance dual-handle (log scale), Mgmt Fee, Copiers AUM, Copiers, Age, Trades, Win Rate, plus an "Investment Amount" input that auto-sets Balance bounds.
-- **Open Trades / Trade History** — click-to-expand pill buttons inside each row, lazy-loaded from `/api/strategies/<id>/signals/{open,closed}`, scrollable on long histories.
-- **Theme-aware** — dark/light, liquid-glass aesthetic with frosted panels and chrome-blob background accents.
-- **Mobile-ready** — adaptive layout for laptops down to iPhone Pro Max widths; expanded card visibly tinted on mobile.
-- **Self-healing catalog** — stale-while-revalidate semantics on the server cache; one-shot `patch-missing.js` to fill any rows the daily rebuild missed.
+| Artifact | Where |
+|---|---|
+| **Proxy container** | [`Dockerfile`](Dockerfile) — `node:22-alpine` (~150 MB), pure-Node OIDC client, no Chromium. A live instance runs at `https://labs-pelican-proxy.mctl.ai`. |
+| **Vue 3 component** | [`@mashkovd/pelican-vue`](https://www.npmjs.com/package/@mashkovd/pelican-vue) on npmjs.com. Source in [`vue/`](vue/). |
 
 ## Architecture
 
 ```
-┌────────────┐     ┌──────────────────┐     ┌────────────────────┐
-│  browser   │ ──▶ │  Pelican proxy   │ ──▶ │ papi.copy-trade.io │
-│ (app.js)   │     │  (server.js)     │     │ (upstream API)     │
-└────────────┘     └──────────────────┘     └────────────────────┘
-                          │                  ▲
-                          │ caches catalog   │ Bearer token
-                          ▼                  │ (30-min lifetime)
-                   ┌──────────────┐    ┌──────────────┐
-                   │ .catalog.json│    │ refresher.js │
-                   │ (10K+ items) │    │ (headless    │
-                   └──────────────┘    │  Chrome      │
-                                       │  login loop) │
-                                       └──────────────┘
+┌──────────────┐     ┌────────────────────┐     ┌────────────────────┐
+│  host app    │ ──▶ │  Pelican proxy     │ ──▶ │ papi.copy-trade.io │
+│ (Vue 3       │     │  server.js +       │     │   (upstream API)   │
+│  component)  │     │  oidc-client.js +  │     └────────────────────┘
+└──────────────┘     │  refresher.js      │
+                     └────────────────────┘
+                            │ caches
+                            ▼
+                     /tmp/.catalog.json
+                     (ephemeral, rebuilt
+                      on pod restart;
+                      daily at 11:00 Kyiv)
 ```
 
-Three Windows services run on the VPS via NSSM:
+`refresher.js` walks `authorization_code+PKCE` against `identity.copy-trade.io` directly with `fetch` + `tough-cookie`, drops the token into `$ENV_PATH`, and rotates it before expiry (refresh_token grant first → silent renew → full re-login fallback).
 
-| Service              | Process              | Purpose |
-| -------------------- | -------------------- | ------- |
-| `PelicanServer`      | `node server.js`     | The proxy + static-file server (port 8787). |
-| `PelicanRefresher`   | `node refresher.js`  | Headless Chrome that re-logs into Libertex when the OAuth token nears expiry. |
-| `PelicanNgrok`       | `ngrok http 8787 …`  | Public HTTPS tunnel via your reserved free `ngrok-free.dev` subdomain. |
-
-## Requirements
-
-- **Windows VPS** (tested on Windows Server 2022/2025; needs RDP / PowerShell access)
-- **Node.js 22+** ([nodejs.org](https://nodejs.org))
-- **ngrok** free account ([signup](https://dashboard.ngrok.com/signup)) with one reserved static domain
-- **Libertex Social account** (the one whose data you want to display)
-
-## Quick start
-
-```powershell
-# 1. Clone
-git clone https://github.com/Yevhen79/pelican-libertex-social.git C:\PelicanSrc
-cd C:\PelicanSrc
-
-# 2. Configure
-copy .env.example .env
-notepad .env
-# Fill in: LIBERTEX_EMAIL, LIBERTEX_PASSWORD, NGROK_AUTHTOKEN, NGROK_DOMAIN
-
-# 3. Install (downloads ngrok + nssm, copies sources to C:\Pelican,
-#    registers the three services and starts them)
-PowerShell -ExecutionPolicy Bypass -File .\install.ps1
-
-# 4. Verify
-Get-Service PelicanServer, PelicanRefresher, PelicanNgrok
-# All three should be Running.
-```
-
-The first daily catalog build takes ~25–35 minutes (it has to fetch meta+stats for every strategy). After that, partial data is served immediately on every page load and the catalog refreshes itself daily at 11:00 Kyiv time.
-
-Open `https://<your-ngrok-domain>.ngrok-free.dev` and you're done.
-
-See [DEPLOY.md](DEPLOY.md) and [README-VPS-Windows.md](README-VPS-Windows.md) for detailed setup, troubleshooting, and how the services hang together.
-
-## Container deployment
-
-A multi-stage `Dockerfile` ships in the repo root for self-hosting on any container runtime. The image (~150 MB) excludes Chromium — token acquisition is delegated either to an in-cluster OIDC client (cloud mode) or to a one-shot manual ingest from any browser (self-hosted mode).
+## Run as a container
 
 ```bash
 docker build -t pelican .
+
 docker run -d --name pelican \
   -e LIBERTEX_EMAIL=...                     \
   -e LIBERTEX_PASSWORD=...                  \
-  -e INGEST_SECRET=$(openssl rand -hex 16)  \
+  -e INGEST_SECRET=$(openssl rand -hex 32)  \
   -p 8787:8787 pelican
+
+# /healthz returns 200 immediately. /readyz flips to 200 after the
+# initial OIDC login completes (~3-5 s).
+curl http://localhost:8787/healthz
+curl http://localhost:8787/readyz
+curl http://localhost:8787/api/strategies?filter=gold
 ```
 
-`start.sh` supervises both `server.js` (proxy + static) and `refresher.js` (token loop) inside the container.
+`INGEST_SECRET` gates `POST /__ingest` for emergency manual token pushes from outside the container; localhost POSTs are allowed unconditionally.
 
-**Endpoints**
+The catalog (`.catalog.json`) lives in the writable layer and is **ephemeral**. Mount a volume at `/app` to persist across restarts; otherwise the first request after a restart triggers a ~3-4 min full rebuild.
 
-- `GET /healthz` — liveness probe; always 200 if the process is up.
-- `GET /readyz` — readiness probe; 200 only once a non-expired token is held.
-- `POST /__ingest` — emergency manual token push. Accepts `{ access_token, expires_at }` JSON. Allowed from localhost unconditionally; from any other origin requires header `X-Ingest-Secret: <INGEST_SECRET>`. Used to bootstrap when the in-cluster refresher hasn't acquired a token yet, or as an override during incident response.
-
-The catalog file (`.catalog.json`) is **ephemeral** in container deploys — it lives inside the container's writable layer and is rebuilt on every restart (~25–35 min for the first build). Mount a volume at `/app` if you want to persist it across restarts.
-
-## Cloud deployment (mctl)
-
-Operator-only. The same image is deployed to a managed cluster via mctl, where an in-cluster OIDC client (`oidc-client.js`) acquires the Libertex bearer token autonomously without a headless browser. End users never touch this path; refer to internal mctl runbooks.
-
-## Maintenance
-
-```powershell
-# Logs
-Get-Content C:\Pelican\logs\server.log -Tail 50
-Get-Content C:\Pelican\logs\refresher.log -Tail 50
-Get-Content C:\Pelican\logs\ngrok.log -Tail 50
-
-# Restart everything
-Restart-Service PelicanServer, PelicanRefresher, PelicanNgrok
-
-# Force-rebuild the catalog (e.g. after upstream outages)
-Remove-Item C:\Pelican\.catalog.json
-Restart-Service PelicanServer
-
-# Patch any rows the daily build missed (transient upstream errors)
-cd C:\Pelican; node patch-missing.js
-```
-
-## Development
+## Use the Vue component
 
 ```bash
-# Run the proxy locally (no Windows services)
-node server.js
-# Then in another shell, the refresher:
-node refresher.js
-```
-
-The bundled frontend (`index.html`, `app.js`, `styles.css`) is plain vanilla JS — no build step. Edit and reload.
-
-### Vue 3 component (`vue/`)
-
-The same UI is also published as a standalone Vue 3 component, so you can embed the catalog into any Vue 3 app without running the bundled HTML/JS. A live proxy is up at `https://labs-pelican-proxy.mctl.ai`, so the host app needs nothing besides the published package.
-
-#### Install
-
-```sh
 npm install @mashkovd/pelican-vue
 ```
-
-`vue@^3.4` is a peer dependency (not bundled).
-
-#### Use
 
 ```vue
 <script setup lang="ts">
@@ -161,85 +65,41 @@ import '@mashkovd/pelican-vue/style.css';
 </script>
 
 <template>
-  <PelicanLibertexSocial
-    api-base="https://labs-pelican-proxy.mctl.ai"
-    theme="auto"
-    default-sort="return-desc"
-    @select-strategy="(s) => console.log(s.Id)"
-    @error="(e) => console.warn(e.code, e.message)"
-  />
+  <PelicanLibertexSocial api-base="https://labs-pelican-proxy.mctl.ai" />
 </template>
 ```
 
-That's the whole integration. The component owns its state — filters, sort, theme, lazy enrichment, trade panels.
+Full props/emits/slots reference and CORS workarounds (Vite/Nuxt/Quasar dev-server proxy) in [`vue/README.md`](vue/README.md).
 
-#### Avoiding CORS via a dev-server proxy
+## API endpoints
 
-The hosted Pelican proxy doesn't set `Access-Control-Allow-Origin`. If your host app runs on a different origin and you don't want to deal with CORS in a reverse proxy, route `/api` through your own dev/prod server.
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | Service identity JSON (proxy name, npm package URL, repo URL, endpoint list) |
+| `GET /healthz` | Liveness probe — always 200 if the process is up |
+| `GET /readyz` | Readiness probe — 200 only when a non-expired token is held |
+| `GET /__status` | Public token TTL info (no token leakage) |
+| `POST /__ingest` | Manual token push. Localhost OR header `X-Ingest-Secret: $INGEST_SECRET` |
+| `GET /api/strategies?filter=…` | Lightweight name search |
+| `GET /api/strategies-full` | Full enriched catalog (10 K+ items, ~5 MB gzipped) |
+| `GET /api/strategies-full/progress` | Build progress polling (`{ ready, building, loaded, total }`) |
+| `GET /api/strategies/{id}` | Strategy metadata |
+| `GET /api/strategies/{id}/stats` | Performance + trade history |
+| `GET /api/strategies/{id}/signals/{open\|closed}` | Open / 30-day-closed trades |
 
-**Vite**:
+## Development
 
-```ts
-// vite.config.ts
-export default defineConfig({
-  server: { proxy: { '/api': 'https://labs-pelican-proxy.mctl.ai' } },
-});
+```bash
+# Proxy + refresher (in two shells, or use start.sh)
+node server.js
+node refresher.js
+
+# Vue component playground (Vite, hits proxy via /api proxy)
+cd vue && npm install && npm run dev
 ```
 
-**Nuxt 3**:
-
-```ts
-// nuxt.config.ts
-export default defineNuxtConfig({
-  routeRules: {
-    '/api/**': { proxy: 'https://labs-pelican-proxy.mctl.ai/api/**' },
-  },
-});
-```
-
-**Quasar**:
-
-```js
-// quasar.config.js
-devServer: { proxy: { '/api': 'https://labs-pelican-proxy.mctl.ai' } }
-```
-
-Then pass an empty `api-base` so requests stay relative:
-
-```vue
-<PelicanLibertexSocial api-base="" />
-```
-
-#### Props, emits, slots
-
-| Prop             | Type                          | Required | Notes |
-| ---------------- | ----------------------------- | -------- | ----- |
-| `apiBase`        | `string`                      | yes      | Base URL of the proxy, or `''` when using a dev-server `/api` proxy. |
-| `theme`          | `'auto' \| 'light' \| 'dark'` | no       | Default `'auto'`. Persists in `localStorage['pelican-theme']`. |
-| `defaultSort`    | `SortKey`                     | no       | Default `'return-desc'`. One of 20 sort modes. |
-| `defaultFilters` | `Partial<FiltersState>`       | no       | Override any of the range filters at mount time. |
-| `columns`        | `ColumnKey[]`                 | no       | Reserved; not yet wired through. |
-| `locale`         | `string`                      | no       | Default `'en-US'`. |
-| `pageSize`       | `number`                      | no       | Rows per page. Default `20`. |
-
-| Event              | Payload                                                                | Fires on                            |
-| ------------------ | ---------------------------------------------------------------------- | ----------------------------------- |
-| `update:theme`     | `'auto' \| 'dark' \| 'light'`                                          | User cycled the theme toggle        |
-| `select-strategy`  | `Strategy`                                                             | A row was expanded                  |
-| `error`            | `{ code, message }`                                                    | `code` ∈ `no_token`, `fetch_failed`, `http_error`, … |
-
-| Slot           | Slot props        | Use for                                      |
-| -------------- | ----------------- | -------------------------------------------- |
-| `#brand`       | —                 | Replace the default header/brand block       |
-| `#empty`       | —                 | Replace the empty-state copy                 |
-| `#row-actions` | `{ strategy }`    | Add per-row buttons (e.g. "copy to clipboard") |
-
-#### Bundle
-
-Vite library mode (`vue/dist/`) — ESM `~55 KB`, UMD `~44 KB`, `style.css` `~12 KB`, rolled-up `.d.ts` `~5 KB`. CSS scopes everything under `.pelican-libsoc` and `.pelican-libsoc[data-theme="dark"]` so it doesn't bleed into the host app.
+CI runs `vue-tsc --noEmit`, `node -c` against the proxy files, and a Docker build on every push to `main` and every PR — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-Personal data, design assets, and `.env` secrets stay out of the repo (see `.gitignore`). Each user runs against their own Libertex account.
+MIT — see [LICENSE](LICENSE). Each user runs against their own Libertex account.

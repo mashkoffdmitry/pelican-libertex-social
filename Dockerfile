@@ -13,7 +13,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY server.js refresher.js oidc-client.js start.sh ./
-COPY index.html app.js styles.css favicon.png logo.png bg-blob.png bg-blob2.png ./
 
 RUN chmod +x start.sh && \
     addgroup -S app && adduser -S -G app -h /home/app app && \

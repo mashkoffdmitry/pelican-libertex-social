@@ -26,15 +26,6 @@ const ROOT = __dirname;
 const ENV_PATH = process.env.ENV_PATH || path.join(ROOT, '.env');
 const UPSTREAM_HOST = 'papi.copy-trade.io';
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js':   'text/javascript; charset=utf-8',
-  '.css':  'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg':  'image/svg+xml',
-  '.ico':  'image/x-icon',
-};
-
 // ---- whitelist of allowed upstream API paths (read-only catalog only) ----
 const ALLOWED = [
   /^\/api\/discover\/?$/,
@@ -768,38 +759,23 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- static files ----
-  let p = u.pathname === '/' ? '/index.html' : u.pathname;
-  const fp = path.join(ROOT, p.replace(/^\/+/, ''));
-  if (!fp.startsWith(ROOT)) { res.writeHead(403); return res.end('forbidden'); }
-  // never serve dotfiles
-  if (path.basename(fp).startsWith('.')) { res.writeHead(404); return res.end('not found'); }
-  if (fs.existsSync(fp) && fs.statSync(fp).isFile()) {
-    const ext = path.extname(fp);
-    const ctype = MIME[ext] || 'application/octet-stream';
-    // Cache aggressively for images/fonts (immutable feel) and a day for HTML/CSS/JS
-    // (we mutate those during dev, so a hard reload picks up changes via Last-Modified).
-    const stat = fs.statSync(fp);
-    const longCache = /^\.(png|jpg|jpeg|gif|webp|ico|svg|woff2?|ttf)$/i.test(ext);
-    const cacheCtrl = longCache ? 'public, max-age=604800' : 'public, max-age=86400';
-    const headers = {
-      'Content-Type': ctype,
-      'Cache-Control': cacheCtrl,
-      'Last-Modified': stat.mtime.toUTCString(),
-    };
-    // 304 for unmodified
-    if (req.headers['if-modified-since'] && new Date(req.headers['if-modified-since']) >= stat.mtime) {
-      res.writeHead(304, headers); return res.end();
-    }
-    // gzip text-y assets in-memory (small enough — html/css/js/svg)
-    const compressible = /^(text\/|application\/(javascript|json)|image\/svg)/.test(ctype);
-    if (compressible) {
-      const body = fs.readFileSync(fp);
-      return sendCompressed(req, res, body, 200, headers);
-    }
-    res.writeHead(200, headers);
-    return fs.createReadStream(fp).pipe(res);
+  // ---- root landing (no static UI; this is a backend) ----
+  if (u.pathname === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify({
+      name: 'pelican-proxy',
+      description: 'Libertex Social copy-trading catalog proxy.',
+      npm: 'https://www.npmjs.com/package/@mashkovd/pelican-vue',
+      repo: 'https://github.com/mashkoffdmitry/pelican-libertex-social',
+      endpoints: [
+        '/healthz', '/readyz', '/__status',
+        '/api/strategies', '/api/strategies-full', '/api/strategies-full/progress',
+        '/api/strategies/{id}', '/api/strategies/{id}/stats',
+        '/api/strategies/{id}/signals/{open|closed}',
+      ],
+    }, null, 2));
   }
+
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('not found: ' + u.pathname);
 });
