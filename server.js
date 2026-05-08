@@ -6,7 +6,7 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.3.0';
+const PKG_VERSION = '0.3.1';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +14,27 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libertex Social — Copy Trading</title>
   <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
-  <style>* { box-sizing: border-box; } html, body { margin: 0; padding: 0; }</style>
+  <style>
+    * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
+    body { position:relative; overflow-x:hidden; }
+    body::before, body::after {
+      content:''; position:fixed; pointer-events:none; z-index:0;
+      background-repeat:no-repeat; background-position:center;
+      background-size:contain; filter:saturate(120%);
+    }
+    body::before {
+      background-image:url('/bg-blob.png');
+      width:920px; height:480px; top:-140px; right:-160px;
+      transform:rotate(-12deg); opacity:.42;
+    }
+    body::after {
+      background-image:url('/bg-blob2.png');
+      width:780px; height:580px; bottom:-180px; left:-140px;
+      transform:rotate(18deg); opacity:.30;
+    }
+    html[data-theme="light"] body::before { opacity:.18; }
+    html[data-theme="light"] body::after { opacity:.12; }
+  </style>
 </head>
 <body>
   <div id="app"></div>
@@ -761,6 +781,16 @@ const server = http.createServer((req, res) => {
     });
     upstreamReq.end();
     return;
+  }
+
+  // ---- static blobs ----
+  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png') {
+    const file = path.join(__dirname, u.pathname.slice(1));
+    if (fs.existsSync(file)) {
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      return fs.createReadStream(file).pipe(res);
+    }
+    res.writeHead(404); return res.end('not found');
   }
 
   // ---- root landing ----
