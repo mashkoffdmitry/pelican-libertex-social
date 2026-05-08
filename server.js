@@ -302,7 +302,7 @@ async function buildFull(token) {
   const baseWithPrev = base.map(b => ({ ...(prevById.get(b.Id) || {}), ...b }));
 
   const out = new Array(baseWithPrev.length);
-  const concurrency = 6;
+  const concurrency = parseInt(process.env.CATALOG_BUILD_CONCURRENCY) || 12;
   let cursor = 0;
   let statsErr = 0, statsNull = 0, fetched = 0;
 
