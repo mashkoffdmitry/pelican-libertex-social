@@ -142,56 +142,116 @@ The bundled frontend (`index.html`, `app.js`, `styles.css`) is plain vanilla JS 
 
 ### Vue 3 component (`vue/`)
 
-The same UI is also published as a standalone Vue 3 component, so you can embed the catalog into any Vue app without running the bundled HTML/JS.
+The same UI is also published as a standalone Vue 3 component, so you can embed the catalog into any Vue 3 app without running the bundled HTML/JS. A live proxy is up at `https://labs-pelican-proxy.mctl.ai`, so the host app needs nothing besides the published package.
 
-```bash
+#### 1. Authenticate to GitHub Packages (one-time)
+
+The package lives on **GitHub Packages**, not the public npm registry. Both your dev machine and CI need a `read:packages` token.
+
+```sh
+# Create a classic PAT at https://github.com/settings/tokens
+#   scope: read:packages
+
+# Add to ~/.npmrc (or project-local .npmrc):
+@mashkoffdmitry:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
+In GitHub Actions, the built-in `GITHUB_TOKEN` works — write the two lines from a secret. The same npmrc snippet works for any CI runner.
+
+#### 2. Install
+
+```sh
 npm install @mashkoffdmitry/pelican-vue
 ```
 
-```ts
-import { PelicanLibertexSocial } from '@mashkoffdmitry/pelican-vue';
-import '@mashkoffdmitry/pelican-vue/style.css';
-```
+`vue@^3.4` is a peer dependency (not bundled).
+
+#### 3. Use
 
 ```vue
-<PelicanLibertexSocial
-  :api-base="'/api'"
-  theme="auto"
-  default-sort="return-desc"
-  :default-filters="{}"
-  locale="en-US"
-  :page-size="100"
-  @select-strategy="(s) => console.log(s.Id)"
-  @error="(e) => console.warn(e.code, e.message)"
-/>
+<script setup lang="ts">
+import { PelicanLibertexSocial } from '@mashkoffdmitry/pelican-vue';
+import '@mashkoffdmitry/pelican-vue/style.css';
+</script>
+
+<template>
+  <PelicanLibertexSocial
+    api-base="https://labs-pelican-proxy.mctl.ai"
+    theme="auto"
+    default-sort="return-desc"
+    @select-strategy="(s) => console.log(s.Id)"
+    @error="(e) => console.warn(e.code, e.message)"
+  />
+</template>
 ```
 
-**Props**
+That's the whole integration. The component owns its state — filters, sort, theme, lazy enrichment, trade panels.
+
+#### Avoiding CORS via a dev-server proxy
+
+The hosted Pelican proxy doesn't set `Access-Control-Allow-Origin`. If your host app runs on a different origin and you don't want to deal with CORS in a reverse proxy, route `/api` through your own dev/prod server.
+
+**Vite**:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  server: { proxy: { '/api': 'https://labs-pelican-proxy.mctl.ai' } },
+});
+```
+
+**Nuxt 3**:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  routeRules: {
+    '/api/**': { proxy: 'https://labs-pelican-proxy.mctl.ai/api/**' },
+  },
+});
+```
+
+**Quasar**:
+
+```js
+// quasar.config.js
+devServer: { proxy: { '/api': 'https://labs-pelican-proxy.mctl.ai' } }
+```
+
+Then pass an empty `api-base` so requests stay relative:
+
+```vue
+<PelicanLibertexSocial api-base="" />
+```
+
+#### Props, emits, slots
 
 | Prop             | Type                          | Required | Notes |
 | ---------------- | ----------------------------- | -------- | ----- |
-| `apiBase`        | `string`                      | yes      | Base URL of the Pelican proxy. Pass `''` (or your dev-server origin with a `/api` proxy entry) to fetch via the dev origin and avoid CORS. |
-| `theme`          | `'auto' \| 'light' \| 'dark'` | no       | Default `'auto'`. |
-| `defaultSort`    | `SortKey`                     | no       | Default `'return-desc'`. |
+| `apiBase`        | `string`                      | yes      | Base URL of the proxy, or `''` when using a dev-server `/api` proxy. |
+| `theme`          | `'auto' \| 'light' \| 'dark'` | no       | Default `'auto'`. Persists in `localStorage['pelican-theme']`. |
+| `defaultSort`    | `SortKey`                     | no       | Default `'return-desc'`. One of 20 sort modes. |
 | `defaultFilters` | `Partial<FiltersState>`       | no       | Override any of the range filters at mount time. |
 | `columns`        | `ColumnKey[]`                 | no       | Reserved; not yet wired through. |
-| `locale`         | `string`                      | no       | Default `'en-US'`; used for number/date formatting. |
-| `pageSize`       | `number`                      | no       | Rows per page. |
+| `locale`         | `string`                      | no       | Default `'en-US'`. |
+| `pageSize`       | `number`                      | no       | Rows per page. Default `20`. |
 
-**Slots**
+| Event              | Payload                                                                | Fires on                            |
+| ------------------ | ---------------------------------------------------------------------- | ----------------------------------- |
+| `update:theme`     | `'auto' \| 'dark' \| 'light'`                                          | User cycled the theme toggle        |
+| `select-strategy`  | `Strategy`                                                             | A row was expanded                  |
+| `error`            | `{ code, message }`                                                    | `code` ∈ `no_token`, `fetch_failed`, `http_error`, … |
 
-- `#brand` — replace the header brand mark.
-- `#empty` — content shown when no rows match the filters.
-- `#row-actions` — extra buttons rendered inside each expanded row.
+| Slot           | Slot props        | Use for                                      |
+| -------------- | ----------------- | -------------------------------------------- |
+| `#brand`       | —                 | Replace the default header/brand block       |
+| `#empty`       | —                 | Replace the empty-state copy                 |
+| `#row-actions` | `{ strategy }`    | Add per-row buttons (e.g. "copy to clipboard") |
 
-**Build outputs** (Vite library mode, `vue/dist/`):
+#### Bundle
 
-- ESM: `pelican-libertex-social.mjs` (~55 KB)
-- UMD: `pelican-libertex-social.umd.cjs` (~44 KB)
-- Styles: `style.css` (~12 KB)
-- Types: `pelican-libertex-social.d.ts`
-
-`vue` itself is an external peer dependency, not bundled.
+Vite library mode (`vue/dist/`) — ESM `~55 KB`, UMD `~44 KB`, `style.css` `~12 KB`, rolled-up `.d.ts` `~5 KB`. CSS scopes everything under `.pelican-libsoc` and `.pelican-libsoc[data-theme="dark"]` so it doesn't bleed into the host app.
 
 ## License
 
