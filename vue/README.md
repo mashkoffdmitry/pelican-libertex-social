@@ -1,4 +1,4 @@
-# @mashkoffdmitry/pelican-vue
+# @mashkovd/pelican-vue
 
 Vue 3 component for browsing Libertex Social copy-trading strategies via a
 [`pelican-libertex-social`](../README.md) proxy. Drop it into any Vue 3 app
@@ -11,7 +11,7 @@ A live proxy is hosted at `https://labs-pelican-proxy.mctl.ai` — point
 ## Install
 
 ```sh
-npm install @mashkoffdmitry/pelican-vue
+npm install @mashkovd/pelican-vue
 ```
 
 `vue@^3.4` is a peer dependency — make sure it's already in your host app.
@@ -20,8 +20,8 @@ npm install @mashkoffdmitry/pelican-vue
 
 ```vue
 <script setup lang="ts">
-import { PelicanLibertexSocial } from '@mashkoffdmitry/pelican-vue';
-import '@mashkoffdmitry/pelican-vue/style.css';
+import { PelicanLibertexSocial } from '@mashkovd/pelican-vue';
+import '@mashkovd/pelican-vue/style.css';
 </script>
 
 <template>

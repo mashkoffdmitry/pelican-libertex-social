@@ -147,7 +147,7 @@ The same UI is also published as a standalone Vue 3 component, so you can embed 
 #### Install
 
 ```sh
-npm install @mashkoffdmitry/pelican-vue
+npm install @mashkovd/pelican-vue
 ```
 
 `vue@^3.4` is a peer dependency (not bundled).
@@ -156,8 +156,8 @@ npm install @mashkoffdmitry/pelican-vue
 
 ```vue
 <script setup lang="ts">
-import { PelicanLibertexSocial } from '@mashkoffdmitry/pelican-vue';
-import '@mashkoffdmitry/pelican-vue/style.css';
+import { PelicanLibertexSocial } from '@mashkovd/pelican-vue';
+import '@mashkovd/pelican-vue/style.css';
 </script>
 
 <template>
