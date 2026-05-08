@@ -70,6 +70,7 @@ function onMax(e: Event) {
         :min="rawMin"
         :max="rawMax"
         :value="lo"
+        :style="{ zIndex: lo <= rawMin || lo >= hi ? 5 : 4 }"
         @input="onMin"
         @change="onMin"
       />
@@ -79,6 +80,7 @@ function onMax(e: Event) {
         :min="rawMin"
         :max="rawMax"
         :value="hi"
+        :style="{ zIndex: lo <= rawMin || lo >= hi ? 4 : 5 }"
         @input="onMax"
         @change="onMax"
       />
