@@ -51,6 +51,10 @@ jobs:
 
   docker:
     name: docker image build
+    # Pre-merge gate: validate the Dockerfile builds before merging into main.
+    # On push to main, mctl rebuilds the same image centrally — duplicating
+    # that here would just burn ~30 s of CI for no gain. Skip on push.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +70,9 @@ jobs:
 
   deploy:
     name: deploy to mctl labs/pelican-proxy
-    needs: [vue, proxy-syntax, docker]
+    # Only depends on the jobs that actually run on push to main. The docker
+    # job is PR-only, so listing it here would skip deploy too.
+    needs: [vue, proxy-syntax]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
