@@ -6,6 +6,28 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
+const PKG_VERSION = '0.3.0';
+const INDEX_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Libertex Social — Copy Trading</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
+  <style>* { box-sizing: border-box; } html, body { margin: 0; padding: 0; }</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.5/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
+  <script>
+    const { createApp, h } = Vue;
+    const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
+    createApp({ render: () => h(PelicanComponent, { apiBase: '' }) }).mount('#app');
+  </script>
+</body>
+</html>`;
+
 // Gzip helper: respect client's Accept-Encoding, only compress text-y payloads
 // (JSON / HTML / CSS / JS / SVG). PNG/JPG/WebP/etc are already compressed.
 function sendCompressed(req, res, body, status, headers) {
@@ -741,8 +763,13 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- root landing (no static UI; this is a backend) ----
+  // ---- root landing ----
   if (u.pathname === '/') {
+    const wantsHtml = (req.headers['accept'] || '').includes('text/html');
+    if (wantsHtml) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(INDEX_HTML);
+    }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     return res.end(JSON.stringify({
       name: 'pelican-proxy',
