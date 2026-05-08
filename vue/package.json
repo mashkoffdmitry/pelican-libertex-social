@@ -1,6 +1,6 @@
 {
   "name": "@mashkoffdmitry/pelican-vue",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "description": "Vue 3 component for browsing Libertex Social copy-trading strategies via a pelican-libertex-social proxy.",
@@ -23,7 +23,6 @@
     "directory": "vue"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "scripts": {

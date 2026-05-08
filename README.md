@@ -144,22 +144,7 @@ The bundled frontend (`index.html`, `app.js`, `styles.css`) is plain vanilla JS 
 
 The same UI is also published as a standalone Vue 3 component, so you can embed the catalog into any Vue 3 app without running the bundled HTML/JS. A live proxy is up at `https://labs-pelican-proxy.mctl.ai`, so the host app needs nothing besides the published package.
 
-#### 1. Authenticate to GitHub Packages (one-time)
-
-The package lives on **GitHub Packages**, not the public npm registry. Both your dev machine and CI need a `read:packages` token.
-
-```sh
-# Create a classic PAT at https://github.com/settings/tokens
-#   scope: read:packages
-
-# Add to ~/.npmrc (or project-local .npmrc):
-@mashkoffdmitry:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=ghp_xxxxxxxxxxxxxxxxxxxx
-```
-
-In GitHub Actions, the built-in `GITHUB_TOKEN` works — write the two lines from a secret. The same npmrc snippet works for any CI runner.
-
-#### 2. Install
+#### Install
 
 ```sh
 npm install @mashkoffdmitry/pelican-vue
@@ -167,7 +152,7 @@ npm install @mashkoffdmitry/pelican-vue
 
 `vue@^3.4` is a peer dependency (not bundled).
 
-#### 3. Use
+#### Use
 
 ```vue
 <script setup lang="ts">

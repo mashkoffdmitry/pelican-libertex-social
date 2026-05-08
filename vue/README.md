@@ -10,27 +10,6 @@ A live proxy is hosted at `https://labs-pelican-proxy.mctl.ai` — point
 
 ## Install
 
-This package lives on **GitHub Packages**, not the public npm registry, so
-both `npm install` and any CI runner need to be authenticated.
-
-**1. Create a Personal Access Token (classic)** at
-<https://github.com/settings/tokens> with the single scope `read:packages`.
-Treat it like any password.
-
-**2. Configure `~/.npmrc`** (or your project's `.npmrc`):
-
-```
-@mashkoffdmitry:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=ghp_xxxxxxxxxxxxxxxxxxxx
-```
-
-In CI: write the same two lines from a secret. GitHub Actions has
-[a built-in `GITHUB_TOKEN`][gh-actions-pkg] that works for `read:packages`.
-
-[gh-actions-pkg]: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry#authenticating-with-a-personal-access-token
-
-**3. Install**:
-
 ```sh
 npm install @mashkoffdmitry/pelican-vue
 ```
