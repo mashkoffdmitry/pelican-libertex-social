@@ -4,6 +4,12 @@ A self-hosted, filterable mirror of the [Libertex Social](https://libertex.copy-
 
 > **Disclaimer.** Unofficial. You point it at your own Libertex Social account credentials. Not affiliated with Libertex Group.
 
+There are three deployment surfaces:
+
+1. **Self-hosted Windows VPS** — the original flow, documented end-to-end below. Headless Chrome + NSSM-managed services + ngrok tunnel. Use this if you have a Windows box.
+2. **Containerized** — `Dockerfile` + `docker run` for self-hosting on any host that runs containers. See [Container deployment](#container-deployment).
+3. **Cloud (mctl)** — autonomous in-cluster OIDC, no Chromium in the image, deployed via mctl. Operator-only; not user-facing.
+
 ![preview](docs/preview.png) <!-- optional; add later if you want a screenshot in the README -->
 
 ---
@@ -77,6 +83,33 @@ Open `https://<your-ngrok-domain>.ngrok-free.dev` and you're done.
 
 See [DEPLOY.md](DEPLOY.md) and [README-VPS-Windows.md](README-VPS-Windows.md) for detailed setup, troubleshooting, and how the services hang together.
 
+## Container deployment
+
+A multi-stage `Dockerfile` ships in the repo root for self-hosting on any container runtime. The image (~150 MB) excludes Chromium — token acquisition is delegated either to an in-cluster OIDC client (cloud mode) or to a one-shot manual ingest from any browser (self-hosted mode).
+
+```bash
+docker build -t pelican .
+docker run -d --name pelican \
+  -e LIBERTEX_EMAIL=...                     \
+  -e LIBERTEX_PASSWORD=...                  \
+  -e INGEST_SECRET=$(openssl rand -hex 16)  \
+  -p 8787:8787 pelican
+```
+
+`start.sh` supervises both `server.js` (proxy + static) and `refresher.js` (token loop) inside the container.
+
+**Endpoints**
+
+- `GET /healthz` — liveness probe; always 200 if the process is up.
+- `GET /readyz` — readiness probe; 200 only once a non-expired token is held.
+- `POST /__ingest` — emergency manual token push. Accepts `{ access_token, expires_at }` JSON. Allowed from localhost unconditionally; from any other origin requires header `X-Ingest-Secret: <INGEST_SECRET>`. Used to bootstrap when the in-cluster refresher hasn't acquired a token yet, or as an override during incident response.
+
+The catalog file (`.catalog.json`) is **ephemeral** in container deploys — it lives inside the container's writable layer and is rebuilt on every restart (~25–35 min for the first build). Mount a volume at `/app` if you want to persist it across restarts.
+
+## Cloud deployment (mctl)
+
+Operator-only. The same image is deployed to a managed cluster via mctl, where an in-cluster OIDC client (`oidc-client.js`) acquires the Libertex bearer token autonomously without a headless browser. End users never touch this path; refer to internal mctl runbooks.
+
 ## Maintenance
 
 ```powershell
@@ -105,7 +138,60 @@ node server.js
 node refresher.js
 ```
 
-The frontend (`index.html`, `app.js`, `styles.css`) is plain vanilla JS — no build step. Edit and reload.
+The bundled frontend (`index.html`, `app.js`, `styles.css`) is plain vanilla JS — no build step. Edit and reload.
+
+### Vue 3 component (`vue/`)
+
+The same UI is also published as a standalone Vue 3 component, so you can embed the catalog into any Vue app without running the bundled HTML/JS.
+
+```bash
+npm install @mashkoffdmitry/pelican-vue
+```
+
+```ts
+import { PelicanLibertexSocial } from '@mashkoffdmitry/pelican-vue';
+import '@mashkoffdmitry/pelican-vue/style.css';
+```
+
+```vue
+<PelicanLibertexSocial
+  :api-base="'/api'"
+  theme="auto"
+  default-sort="return-desc"
+  :default-filters="{}"
+  locale="en-US"
+  :page-size="100"
+  @select-strategy="(s) => console.log(s.Id)"
+  @error="(e) => console.warn(e.code, e.message)"
+/>
+```
+
+**Props**
+
+| Prop             | Type                          | Required | Notes |
+| ---------------- | ----------------------------- | -------- | ----- |
+| `apiBase`        | `string`                      | yes      | Base URL of the Pelican proxy. Pass `''` (or your dev-server origin with a `/api` proxy entry) to fetch via the dev origin and avoid CORS. |
+| `theme`          | `'auto' \| 'light' \| 'dark'` | no       | Default `'auto'`. |
+| `defaultSort`    | `SortKey`                     | no       | Default `'return-desc'`. |
+| `defaultFilters` | `Partial<FiltersState>`       | no       | Override any of the range filters at mount time. |
+| `columns`        | `ColumnKey[]`                 | no       | Reserved; not yet wired through. |
+| `locale`         | `string`                      | no       | Default `'en-US'`; used for number/date formatting. |
+| `pageSize`       | `number`                      | no       | Rows per page. |
+
+**Slots**
+
+- `#brand` — replace the header brand mark.
+- `#empty` — content shown when no rows match the filters.
+- `#row-actions` — extra buttons rendered inside each expanded row.
+
+**Build outputs** (Vite library mode, `vue/dist/`):
+
+- ESM: `pelican-libertex-social.mjs` (~55 KB)
+- UMD: `pelican-libertex-social.umd.cjs` (~44 KB)
+- Styles: `style.css` (~12 KB)
+- Types: `pelican-libertex-social.d.ts`
+
+`vue` itself is an external peer dependency, not bundled.
 
 ## License
 
