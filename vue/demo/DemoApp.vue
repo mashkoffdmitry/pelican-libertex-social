@@ -2,7 +2,10 @@
 import { ref } from 'vue';
 import { PelicanLibertexSocial } from '../src';
 
-const apiBase = ref('http://localhost:8787');
+// Empty string => requests go to the dev origin (:5173) and Vite's
+// `server.proxy['/api']` forwards them to the proxy on :8787. Using an
+// absolute URL here would trigger cross-origin (CORS) requests instead.
+const apiBase = ref('');
 const lastError = ref<string | null>(null);
 const lastSelected = ref<number | null>(null);
 </script>
