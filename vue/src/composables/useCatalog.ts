@@ -9,6 +9,19 @@ import {
 
 export interface UseCatalogOptions {
   apiBase: Ref<string>;
+  /**
+   * Optional separate origin for the *static* catalog endpoints
+   * (`/api/strategies-full` and `/api/strategies-full/progress`).
+   *
+   * Intended use: a Cloudflare Worker fronting an R2 bucket — the catalog
+   * lives on the edge, while live per-strategy data still goes through the
+   * pelican-proxy at `apiBase`. When provided and different from `apiBase`,
+   * `useCatalog` skips the partial-load polling loop (the edge always serves
+   * a fully-built catalog).
+   *
+   * If omitted, all endpoints — including catalog — go through `apiBase`.
+   */
+  catalogBase?: Ref<string | undefined>;
   onError?(err: PelicanError): void;
 }
 
@@ -26,7 +39,7 @@ export interface UseCatalogReturn {
   stop(): void;
 }
 
-export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogReturn {
+export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions): UseCatalogReturn {
   const byIdRef = shallowRef<Map<number, Strategy>>(new Map());
   const ready = ref(false);
   const building = ref(false);
@@ -43,10 +56,20 @@ export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogR
     else console.warn('[pelican-vue]', e);
   };
 
+  // When catalogBase is set and points somewhere other than apiBase, the
+  // edge catalog is pre-built and immediately complete — no progress/partial
+  // dance needed. Otherwise (legacy single-origin setup) we fall back to the
+  // proxy's partial-load + progress polling protocol.
+  const isEdgeCatalog = () => {
+    const cb = catalogBase?.value;
+    return !!cb && cb !== apiBase.value;
+  };
+  const catalogOrigin = () => catalogBase?.value || apiBase.value;
+
   async function fetchAndMerge(partial: boolean) {
     try {
       const url = partial ? '/api/strategies-full?partial=1' : '/api/strategies-full';
-      const items = await api<Strategy[]>(url, apiBase.value);
+      const items = await api<Strategy[]>(url, catalogOrigin());
       total.value = items.length;
       const m = byIdRef.value;
       for (const it of items) m.set(it.Id, { ...m.get(it.Id), ...it } as Strategy);
@@ -58,7 +81,7 @@ export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogR
 
   async function pollProgress(): Promise<ProgressResponse | null> {
     try {
-      const p = await api<ProgressResponse>('/api/strategies-full/progress', apiBase.value);
+      const p = await api<ProgressResponse>('/api/strategies-full/progress', catalogOrigin());
       loaded.value = p.loaded;
       total.value = p.total || total.value;
       building.value = p.building;
@@ -71,6 +94,14 @@ export function useCatalog({ apiBase, onError }: UseCatalogOptions): UseCatalogR
   }
 
   async function loadFull() {
+    if (isEdgeCatalog()) {
+      // Single fetch — the edge catalog is always ready; no partial/polling.
+      await fetchAndMerge(false);
+      // Best-effort progress fetch so callers can read built_at; failures are non-fatal.
+      void pollProgress();
+      ready.value = true;
+      return;
+    }
     await fetchAndMerge(true);
     let lastPaint = Date.now();
     while (!stopped) {

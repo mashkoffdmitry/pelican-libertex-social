@@ -12,6 +12,7 @@ artifacts:
 
 - **Proxy container** — `Dockerfile` → `ghcr.io/mctlhq/pelican-proxy:<tag>` → `https://labs-pelican-proxy.mctl.ai`
 - **Vue 3 component** — [`@mashkovd/pelican-vue`](https://www.npmjs.com/package/@mashkovd/pelican-vue) on public npmjs
+- **Catalog edge worker** — Cloudflare Worker (`worker/`) + R2 bucket `pelican-catalog`. Proxy pushes the freshly-built catalog after every rebuild; Worker serves it on the edge. Optional — proxy still serves `/api/strategies-full` itself when worker isn't configured.
 
 ## Where things live
 
@@ -23,8 +24,10 @@ artifacts:
 | `start.sh` | Supervises `server.js` + `refresher.js`. **busybox-compatible** — `wait -n` doesn't exist on Alpine, uses `kill -0` poll loop instead. |
 | `Dockerfile` | `node:22.11-alpine3.20` pinned, tini, non-root user `app`, HEALTHCHECK on `/healthz`. |
 | `vue/` | Vue 3 SFC + Vite library mode → `@mashkovd/pelican-vue` on npmjs. Decoupled SemVer from the proxy. |
+| `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deploy: `cd worker && npx wrangler deploy`. |
+| `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
 | `.github/workflows/ci.yml` | `vue` + `proxy-syntax` (always), `docker` (PR-only gate), `deploy` (push-to-main only). |
-| `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. |
+| `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. Optionally `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` for Worker push. |
 
 ## Production
 
@@ -101,6 +104,12 @@ enabled, otherwise `npm publish` 403s on accounts with 2FA.
   mctl-api validates it against `api.github.com/user` and maps the
   identity to tenant access. Can NOT use a granular token (no scope to
   pick).
+- **Cloudflare Worker double-gzip:** if you store a gzipped catalog on R2 and
+  serve it back with `Content-Encoding: gzip`, CF's edge re-compresses on
+  egress when the client sends `Accept-Encoding: gzip` → gzip-of-gzip,
+  garbage in the browser. The fix in `worker/src/index.ts` is to store the
+  catalog **raw** (decompress in `/__ingest`) and let CF auto-compress on
+  egress. Don't add `Content-Encoding: gzip` to the GET response.
 
 ## When you scaffold a NEW mctl service from this project's experience
 
@@ -111,6 +120,33 @@ templates for Node / Python / Go / static. The `mctl_deploy_service` and
 `mctl_grant_repo_access` MCP tool descriptions point at the same URL,
 so a fresh Claude session reading the tools should already know the
 procedure.
+
+## Cloudflare Worker (catalog edge)
+
+Optional layer that fronts the catalog from R2 — see [`worker/README.md`](worker/README.md).
+
+One-time setup:
+```bash
+cd worker && npm install
+npx wrangler r2 bucket create pelican-catalog       # creates the R2 bucket
+npx wrangler secret put INGEST_SECRET                # set to a random hex string
+npx wrangler deploy                                  # prints the worker URL
+```
+
+Then on the proxy side (in `.env` or k8s secret_env_vars):
+```
+CATALOG_INGEST_URL=https://pelican-catalog-worker.<account>.workers.dev/__ingest
+CATALOG_INGEST_SECRET=<same as Worker INGEST_SECRET>
+```
+
+When unset on the proxy, the upload step is silently skipped (forks without
+Cloudflare still work). When set, every successful `buildFull()` POSTs the
+gzipped catalog to the Worker, which decompresses, stores raw JSON to R2,
+and serves it from the edge with 1h cache.
+
+In the Vue widget, pass `catalog-base="<worker-url>"` alongside `api-base`
+to fetch the catalog from the edge while live data still goes through the
+proxy.
 
 ## External resources
 

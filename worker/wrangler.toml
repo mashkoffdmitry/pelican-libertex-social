@@ -1,0 +1,23 @@
+name = "pelican-catalog-worker"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# R2 bucket binding — create the bucket first:
+#   wrangler r2 bucket create pelican-catalog
+[[r2_buckets]]
+binding = "CATALOG"
+bucket_name = "pelican-catalog"
+
+# Shared secret used to authenticate POST /__ingest calls from pelican-proxy.
+# Set with:
+#   wrangler secret put INGEST_SECRET
+# (use the same value as CATALOG_INGEST_SECRET in pelican-proxy's env.)
+
+# Optional custom domain — uncomment after adding the route in CF dashboard:
+# routes = [
+#   { pattern = "pelican-catalog.mctl.ai/*", custom_domain = true }
+# ]
+
+# Observability: enables console.log capture in the dashboard.
+[observability]
+enabled = true

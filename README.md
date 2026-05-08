@@ -10,6 +10,7 @@ A read-only proxy + Vue 3 component for browsing the [Libertex Social](https://l
 |---|---|
 | **Proxy container** | [`Dockerfile`](Dockerfile) — `node:22-alpine` (~150 MB), pure-Node OIDC client, no Chromium. A live instance runs at `https://labs-pelican-proxy.mctl.ai`. |
 | **Vue 3 component** | [`@mashkovd/pelican-vue`](https://www.npmjs.com/package/@mashkovd/pelican-vue) on npmjs.com. Source in [`vue/`](vue/). |
+| **Catalog edge worker** | Cloudflare Worker + R2 bucket fronting `/api/strategies-full`. Source in [`worker/`](worker/). Optional — proxy works standalone. |
 
 ## Architecture
 
@@ -51,6 +52,19 @@ curl http://localhost:8787/api/strategies?filter=gold
 `INGEST_SECRET` gates `POST /__ingest` for emergency manual token pushes from outside the container; localhost POSTs are allowed unconditionally.
 
 The catalog (`.catalog.json`) lives in the writable layer and is **ephemeral**. Mount a volume at `/app` to persist across restarts; otherwise the first request after a restart triggers a ~3-4 min full rebuild.
+
+### Optional: offload the catalog to Cloudflare R2
+
+To stop serving the 5 MB catalog from k8s and give it edge-cached, the proxy
+can push every freshly-built catalog to a Cloudflare Worker (which writes it
+to an R2 bucket and serves it back). Set:
+
+- `CATALOG_INGEST_URL` — `https://<your-worker>.workers.dev/__ingest`
+- `CATALOG_INGEST_SECRET` — must match `INGEST_SECRET` set on the Worker
+
+When unset, the upload step is skipped silently and the proxy keeps serving
+`/api/strategies-full` directly. See [`worker/README.md`](worker/README.md)
+for one-time Worker deploy instructions.
 
 ## Use the Vue component
 

@@ -44,10 +44,28 @@ jobs:
       - run: node -c server.js
       - run: node -c refresher.js
       - run: node -c oidc-client.js
+      - run: node -c r2-uploader.js
       # oidc-client is side-effect free; verify it actually loads.
       - run: node -e "const m = require('./oidc-client'); if (!m.loginAndGetToken) process.exit(1)"
+      - run: node -e "const m = require('./r2-uploader'); if (typeof m.uploadCatalog !== 'function') process.exit(1)"
       - name: Verify start.sh is POSIX-sh compatible
         run: sh -n start.sh
+
+  worker:
+    name: worker/ type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
 
   docker:
     name: docker image build

@@ -19,12 +19,20 @@ import type { SignalKind } from './types/api';
 import type { PelicanError } from './utils/http';
 import type { SortKey, SortColumn } from './constants/sort';
 import { PAGE_SIZE } from './constants/defaults';
-import { LOCALE_KEY, API_BASE_KEY } from './injection-keys';
+import { LOCALE_KEY, API_BASE_KEY, CATALOG_BASE_KEY } from './injection-keys';
 import './styles/index.css';
 
 const props = withDefaults(
   defineProps<{
     apiBase: string;
+    /**
+     * Optional separate origin for the *static* catalog endpoints
+     * (`/api/strategies-full` and `/api/strategies-full/progress`). When set,
+     * the catalog is fetched from this URL — typically a Cloudflare Worker
+     * fronting an R2 bucket — while live per-strategy data continues to go
+     * through `apiBase`.
+     */
+    catalogBase?: string;
     theme?: ThemeMode;
     defaultSort?: SortKey;
     defaultFilters?: Partial<FiltersState>;
@@ -47,9 +55,11 @@ const emit = defineEmits<{
 }>();
 
 provide(API_BASE_KEY, props.apiBase);
+provide(CATALOG_BASE_KEY, props.catalogBase ?? props.apiBase);
 provide(LOCALE_KEY, props.locale);
 
 const apiBaseRef = toRef(props, 'apiBase');
+const catalogBaseRef = toRef(props, 'catalogBase');
 
 const themeApi = useTheme(props.theme);
 watch(themeApi.mode, (m) => emit('update:theme', m));
@@ -60,6 +70,7 @@ watch(
 
 const catalog = useCatalog({
   apiBase: apiBaseRef,
+  catalogBase: catalogBaseRef,
   onError: (e) => emit('error', e),
 });
 

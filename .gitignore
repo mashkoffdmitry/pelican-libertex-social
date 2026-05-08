@@ -7,6 +7,10 @@ ngrok.exe
 ngrok
 .DS_Store
 
+# Cloudflare Worker / wrangler local state
+worker/.wrangler/
+worker/.dev.vars
+
 # Editor / agent local state
 .claude/
 .vscode/

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const zlib = require('zlib');
+const { uploadCatalog } = require('./r2-uploader');
 
 // Gzip helper: respect client's Accept-Encoding, only compress text-y payloads
 // (JSON / HTML / CSS / JS / SVG). PNG/JPG/WebP/etc are already compressed.
@@ -413,6 +414,7 @@ function getFull(token) {
       fullCache = { at: Date.now(), items, partial: fullCache.items, building: null, progress: { loaded: items.length, total: items.length } };
       console.log(`[full] background-rebuilt ${items.length} enriched strategies in ${((Date.now()-t0)/1000).toFixed(1)}s`);
       saveCatalogToDisk(items);
+      uploadCatalog(items);
       return items;
     })();
     return Promise.resolve(fullCache.items);
@@ -425,6 +427,7 @@ function getFull(token) {
     fullCache = { at: Date.now(), items, partial: items, building: null, progress: { loaded: items.length, total: items.length } };
     console.log(`[full] built ${items.length} enriched strategies in ${((Date.now()-t0)/1000).toFixed(1)}s`);
     saveCatalogToDisk(items);
+    uploadCatalog(items);
     return items;
   })();
   return fullCache.building;

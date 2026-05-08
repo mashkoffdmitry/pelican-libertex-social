@@ -65,12 +65,26 @@ in `quasar.config.js`.
 
 | prop             | type                              | default          | notes                                    |
 | ---------------- | --------------------------------- | ---------------- | ---------------------------------------- |
-| `apiBase`        | `string` (required)               | —                | Base URL of the pelican proxy            |
+| `apiBase`        | `string` (required)               | —                | Base URL of the pelican proxy. Used for live per-strategy data (`/api/strategies/{id}`, `/stats`, `/signals/*`) and — unless `catalogBase` is set — for the catalog as well. |
+| `catalogBase`    | `string`                          | `apiBase`        | Optional separate origin for the static catalog (`/api/strategies-full` and `/progress`). Point at a Cloudflare Worker fronting the R2 bucket to serve the catalog from the edge. When set, the component skips the partial-load polling loop and fetches the catalog in a single request. |
 | `theme`          | `'auto' \| 'dark' \| 'light'`     | `'auto'`         | Persists in `localStorage['pelican-theme']` |
 | `defaultSort`    | `SortKey`                         | `'return-desc'`  | One of 20 sort modes                     |
 | `defaultFilters` | `Partial<FiltersState>`           | `{}`             | Initial filter values                    |
 | `locale`         | `string`                          | `'en-US'`        | Used for number/date formatting          |
 | `pageSize`       | `number`                          | `20`             | Rows per page                            |
+
+### Two-origin example (proxy + edge)
+
+```vue
+<PelicanLibertexSocial
+  api-base="https://labs-pelican-proxy.mctl.ai"
+  catalog-base="https://pelican-catalog-worker.example.workers.dev"
+/>
+```
+
+The 5 MB catalog comes from the Worker (edge-cached, no auth, fast).
+Per-strategy live calls — `/api/strategies/{id}`, stats, signals — still go
+through the pelican-proxy, which holds the OIDC token.
 
 ## Emits
 
