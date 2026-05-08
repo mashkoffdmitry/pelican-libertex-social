@@ -13,13 +13,13 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libertex Social — Copy Trading</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
   <style>* { box-sizing: border-box; } html, body { margin: 0; padding: 0; }</style>
 </head>
 <body>
   <div id="app"></div>
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.5/dist/vue.global.prod.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
+  <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
   <script>
     const { createApp, h } = Vue;
     const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
