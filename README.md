@@ -98,7 +98,7 @@ node refresher.js
 cd vue && npm install && npm run dev
 ```
 
-CI runs `vue-tsc --noEmit`, `node -c` against the proxy files, and a Docker build on every push to `main` and every PR — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI runs `vue-tsc --noEmit`, `node -c` against the proxy files, and a Docker build on every push to `main` and every PR — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml). On pushes to `main` the workflow also auto-bumps the patch SemVer tag and triggers an mctl deploy to `labs-pelican-proxy.mctl.ai`.
 
 ## License
 
