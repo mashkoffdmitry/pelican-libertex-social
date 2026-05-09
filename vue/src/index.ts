@@ -1,4 +1,5 @@
 export { default as PelicanLibertexSocial } from './PelicanLibertexSocial.vue';
+export { default as TraderProfile } from './components/TraderProfile.vue';
 
 export type { Strategy, HistoryPoint, MarketSlice, Trade, RiskLevel } from './types/strategy';
 export { defaultFilters, type FiltersState } from './types/filters';

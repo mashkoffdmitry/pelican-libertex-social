@@ -6,34 +6,19 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.3.4';
+const PKG_VERSION = '0.3.5';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Libertex Social — Copy Trading</title>
-  <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
+  <title>Libertex Social — Trader Profile</title>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
-    body { position:relative; overflow-x:hidden; }
-    body::before, body::after {
-      content:''; position:fixed; pointer-events:none; z-index:0;
-      background-repeat:no-repeat; background-position:center;
-      background-size:contain; filter:saturate(120%);
-    }
-    body::before {
-      background-image:url('/bg-blob.png');
-      width:920px; height:480px; top:-140px; right:-160px;
-      transform:rotate(-12deg); opacity:.42;
-    }
-    body::after {
-      background-image:url('/bg-blob2.png');
-      width:780px; height:580px; bottom:-180px; left:-140px;
-      transform:rotate(18deg); opacity:.30;
-    }
-    html[data-theme="light"] body::before { opacity:.18; }
-    html[data-theme="light"] body::after { opacity:.12; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { position: relative; overflow-x: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    #app { min-height: 100vh; }
   </style>
 </head>
 <body>
@@ -42,8 +27,8 @@ const INDEX_HTML = `<!DOCTYPE html>
   <script src="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
   <script>
     const { createApp, h } = Vue;
-    const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
-    createApp({ render: () => h(PelicanComponent, { apiBase: '' }) }).mount('#app');
+    const TraderProfile = window.PelicanLibertexSocial.TraderProfile;
+    createApp({ render: () => h(TraderProfile, { theme: 'light' }) }).mount('#app');
   </script>
 </body>
 </html>`;
