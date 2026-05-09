@@ -66,13 +66,21 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
   };
   const catalogOrigin = () => catalogBase?.value || apiBase.value;
 
-  async function fetchAndMerge(partial: boolean) {
+  async function fetchAndMerge(partial: boolean, fieldsParam: string = '') {
     try {
-      const url = partial ? '/api/strategies-full?partial=1' : '/api/strategies-full';
-      const items = await api<Strategy[]>(url, catalogOrigin());
-      total.value = items.length;
+      const url = partial
+        ? `/api/strategies-full?partial=1${fieldsParam}`
+        : `/api/strategies-full${fieldsParam}`;
+      const items = await api<any[]>(url, catalogOrigin());
+
+      // If essential-only, expand back to full Strategy type
+      const expanded = fieldsParam.includes('essential')
+        ? items.map(expandEssential)
+        : items;
+
+      total.value = expanded.length;
       const m = byIdRef.value;
-      for (const it of items) m.set(it.Id, { ...m.get(it.Id), ...it } as Strategy);
+      for (const it of expanded) m.set(it.Id, { ...m.get(it.Id), ...it } as Strategy);
       triggerRef(byIdRef);
     } catch (e) {
       handleError(e);
@@ -94,14 +102,42 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
   }
 
   async function loadFull() {
+    // Detect network speed for optimization
+    const connection = (navigator as any).connection;
+    const effectiveType = connection?.effectiveType; // '4g', '3g', '2g'
+    const isSlowNetwork = effectiveType === '3g' || effectiveType === '2g';
+    const fieldsParamEssential = isSlowNetwork ? '&fields=essential' : '';
+
     if (isEdgeCatalog()) {
       // Single fetch — the edge catalog is always ready; no partial/polling.
+      // R2 doesn't support fields param yet, fetch full
       await fetchAndMerge(false);
       // Best-effort progress fetch so callers can read built_at; failures are non-fatal.
       void pollProgress();
       ready.value = true;
+
+      // On slow networks, also fetch full data in background
+      if (isSlowNetwork) {
+        setTimeout(() => {
+          void fetchAndMerge(false);
+        }, 500);
+      }
       return;
     }
+
+    // On slow networks: fetch essential first, then full in background
+    if (isSlowNetwork) {
+      await fetchAndMerge(true, fieldsParamEssential);
+      ready.value = true; // Mark as ready with essential data
+
+      // Fetch full data in background without blocking UI
+      setTimeout(() => {
+        void fetchAndMerge(false); // Full data, no partial param
+      }, 500);
+      return;
+    }
+
+    // On fast networks: use normal polling flow
     await fetchAndMerge(true);
     let lastPaint = Date.now();
     while (!stopped) {
@@ -304,4 +340,48 @@ function mergeStatsInto(cur: Strategy, stats: StatsResponse | null) {
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// Decode essential-only format back to Strategy type
+// Essential format: { i: Id, n: Name, r: Return%, rp: RiskProfileCode, nc: NumCopiers }
+function expandEssential(essential: any): Strategy {
+  return {
+    Id: essential.i,
+    Name: essential.n ?? null,
+    Return: essential.r ?? null,
+    RiskProfile: codeToRisk(essential.rp),
+    NumCopiers: essential.nc ?? null,
+    // Other fields will be null/undefined until full data arrives
+    ImageUploaded: null,
+    Profile: null,
+    Fee: null,
+    IsSimulated: false,
+    IsEnabled: true,
+    Inception: null,
+    Currency: null,
+    MaxDD: null,
+    RealisedPnl: null,
+    UnrealisedPnl: null,
+    TradesTotal: 0,
+    Wins: 0,
+    Losses: 0,
+    Markets: [],
+    AccountBalance: null,
+    CopiersAUM: null,
+    MonthlyProfit: null,
+    YearlyProfit: null,
+    History: [],
+    _stats: false,
+    _meta: false,
+  };
+}
+
+// Decode RiskProfile from numeric code (0=Low, 1=Medium, 2=High)
+function codeToRisk(code: number | null | undefined): ('Low' | 'Medium' | 'High') | null {
+  switch (code) {
+    case 0: return 'Low';
+    case 1: return 'Medium';
+    case 2: return 'High';
+    default: return null;
+  }
 }

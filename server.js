@@ -473,6 +473,34 @@ function getFull(token) {
   return fullCache.building;
 }
 
+// ---- Helper functions for essential-only fields ----
+function riskToCode(risk) {
+  switch(risk) {
+    case 'Low': return 0;
+    case 'Medium': return 1;
+    case 'High': return 2;
+    default: return null;
+  }
+}
+
+function toEssential(strategy) {
+  // Compact version with aliased short keys for slow networks
+  return {
+    i: strategy.Id,                      // Id
+    n: strategy.Name || null,            // Name
+    r: strategy.Return ?? null,          // Return%
+    rp: riskToCode(strategy.RiskProfile),// RiskProfile (0=Low, 1=Med, 2=High)
+    nc: strategy.NumCopiers ?? null,     // NumCopiers
+    // Optional: include more fields if needed
+    // ii: strategy.ImageUploaded ?? null, // ImageUploaded
+  };
+}
+
+function filterToEssential(items) {
+  // Convert array to essential-only format
+  return items.map(toEssential);
+}
+
 // ---- interval scheduler: rebuild every CATALOG_REBUILD_INTERVAL_H hours ----
 function startScheduler() {
   console.log(`[scheduler] rebuild every ${REBUILD_INTERVAL_H}h (FULL_TTL ${REBUILD_INTERVAL_H + 2}h)`);
@@ -672,19 +700,30 @@ const server = http.createServer((req, res) => {
 
   // ---- /api/strategies-full (full catalog; ?partial=1 returns whatever's loaded so far) ----
   // disabled strategies (IsEnabled=false) don't load on libertex.copy-trade.io and are filtered out.
+  // ?fields=essential returns minimal fields (Id, Name, Return%, Risk, NumCopiers) for slow networks
   if (u.pathname === '/api/strategies-full') {
     if (req.method !== 'GET') { res.writeHead(405); return res.end(); }
     if (tooMany(req)) { res.writeHead(429, { 'Retry-After':'60' }); return res.end('rate_limited'); }
     const env = readEnv();
     if (!env.ACCESS_TOKEN) { res.writeHead(503); return res.end('no_token'); }
     const allowPartial = u.query.partial === '1';
+    const fieldsParam = u.query.fields; // 'essential' or undefined
     const onlyEnabled = arr => arr.filter(s => s.IsEnabled !== false);
+
+    function applyFields(arr) {
+      let out = onlyEnabled(arr);
+      if (fieldsParam === 'essential') {
+        out = filterToEssential(out);
+      }
+      return out;
+    }
+
     // Partial mode: prefer items if we have them (fresh or stale), fall back to partial
     // (in-flight build's pre-fill). Either way the user sees something instead of waiting.
     if (allowPartial) {
       const src = fullCache.items || fullCache.partial;
       if (src) {
-        const out = onlyEnabled(src);
+        const out = applyFields(src);
         sendCompressed(req, res, Buffer.from(JSON.stringify(out)), 200, {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
@@ -692,6 +731,7 @@ const server = http.createServer((req, res) => {
           'X-Catalog-Building': fullCache.building ? '1' : '0',
           'X-Catalog-Size': String(out.length),
           'X-Catalog-Loaded': String(fullCache.progress.loaded),
+          'X-Catalog-Fields': fieldsParam === 'essential' ? 'essential' : 'full',
         });
         // touch getFull so a stale-while-revalidate kick happens if needed
         getFull(env.ACCESS_TOKEN).catch(()=>{});
@@ -713,7 +753,7 @@ const server = http.createServer((req, res) => {
       }
     }
     getFull(env.ACCESS_TOKEN).then(items => {
-      const out = onlyEnabled(items);
+      const out = applyFields(items);
       sendCompressed(req, res, Buffer.from(JSON.stringify(out)), 200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -721,6 +761,7 @@ const server = http.createServer((req, res) => {
         'X-Catalog-Built-At': String(fullCache.at),
         'X-Catalog-Size': String(out.length),
         'X-Catalog-Total-Raw': String(items.length),
+        'X-Catalog-Fields': fieldsParam === 'essential' ? 'essential' : 'full',
       });
     }).catch(e => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
