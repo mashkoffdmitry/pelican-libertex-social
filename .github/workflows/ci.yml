@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'preview/**'
   pull_request:
 
 jobs:
@@ -214,3 +216,179 @@ jobs:
               echo "🔗 Live: https://labs-pelican-proxy.mctl.ai/__status"
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  preview:
+    name: preview deployment (preview/* branches)
+    needs: [vue, proxy-syntax]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/preview/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      MCTL_API: https://api.mctl.ai/api/v1
+      TEAM: labs
+      SERVICE: pelican-proxy
+      REPO: mashkoffdmitry/pelican-libertex-social
+    steps:
+      - name: Gate secrets
+        id: gate
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ] || [ -z "${{ secrets.MCTL_GITHUB_TOKEN }}" ]; then
+            echo "::warning::NPM_TOKEN or MCTL_GITHUB_TOKEN not configured — skipping preview"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: vue/package-lock.json
+
+      - name: Compute preview versions
+        id: ver
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          BASE=$(node -p "require('./vue/package.json').version" | sed 's/-preview\..*//')
+          PRE="${BASE}-preview.${{ github.run_number }}"
+          GIT_TAG="preview.${{ github.run_number }}"
+          STABLE=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo "0.0.0")
+          echo "pre=$PRE"         >> "$GITHUB_OUTPUT"
+          echo "git_tag=$GIT_TAG" >> "$GITHUB_OUTPUT"
+          echo "stable=$STABLE"   >> "$GITHUB_OUTPUT"
+          echo "Preview: $PRE | Tag: $GIT_TAG | Stable rollback: $STABLE"
+
+      - name: Build & publish pre-release npm package
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: vue
+        run: |
+          npm ci
+          npm run build
+          npm version --no-git-tag-version "${{ steps.ver.outputs.pre }}"
+          npm publish --tag preview --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create preview git tag (ephemeral PKG_VERSION patch)
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          sed -i "s|const PKG_VERSION = '[^']*'|const PKG_VERSION = '${{ steps.ver.outputs.pre }}'|" server.js
+          git add server.js
+          git commit -m "chore: preview ${{ steps.ver.outputs.git_tag }}"
+          git tag -a "${{ steps.ver.outputs.git_tag }}" \
+            -m "Preview ${{ steps.ver.outputs.git_tag }} from ${{ github.sha }}"
+          # Push only the tag — branch stays clean
+          git push origin "${{ steps.ver.outputs.git_tag }}"
+
+      - name: Deploy image via mctl deploy-service
+        id: deploy
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          response=$(curl -fsS -X POST "$MCTL_API/operations/deploy-service/execute" \
+            -H "Authorization: Bearer ${{ secrets.MCTL_GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"action\": \"deploy\",
+              \"team_name\": \"$TEAM\",
+              \"component_name\": \"$SERVICE\",
+              \"dockerfile_repo\": \"$REPO\",
+              \"git_tag\": \"${{ steps.ver.outputs.git_tag }}\"
+            }")
+          echo "response: $response"
+          wf=$(echo "$response" | jq -r '.workflow.workflowName // .workflowName // empty')
+          echo "workflow=$wf" >> "$GITHUB_OUTPUT"
+
+      - name: Poll deploy workflow (max 8 min)
+        id: poll
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          WF="${{ steps.deploy.outputs.workflow }}"
+          if [ -z "$WF" ]; then
+            echo "::error::deploy-service returned no workflow name"
+            exit 1
+          fi
+          echo "Polling: $WF"
+          for i in $(seq 1 24); do
+            sleep 20
+            status=$(curl -fsS "$MCTL_API/workflows/$WF" \
+              -H "Authorization: Bearer ${{ secrets.MCTL_GITHUB_TOKEN }}" \
+              | jq -r '.status // .phase // "Unknown"')
+            echo "[$i/24] $WF → $status"
+            if [ "$status" = "Succeeded" ]; then
+              echo "deploy_ok=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            elif echo "$status" | grep -qiE 'fail|error'; then
+              echo "deploy_ok=false" >> "$GITHUB_OUTPUT"
+              echo "::error::Deploy workflow failed: $status"
+              exit 1
+            fi
+          done
+          echo "::error::Timed out after 8 min — $WF still running"
+          exit 1
+
+      - name: Create preview environment
+        id: preview
+        if: steps.gate.outputs.skip != 'true' && steps.poll.outputs.deploy_ok == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          response=$(curl -fsS -X POST "$MCTL_API/operations/preview-deploy/execute" \
+            -H "Authorization: Bearer ${{ secrets.MCTL_GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"team_name\": \"$TEAM\",
+              \"component_name\": \"$SERVICE\",
+              \"image_tag\": \"${{ steps.ver.outputs.git_tag }}\",
+              \"ttl_hours\": 72
+            }")
+          echo "response: $response"
+          url=$(echo "$response" | jq -r '.url // .preview_url // .previewUrl // empty')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Rollback production to stable
+        if: steps.gate.outputs.skip != 'true' && steps.poll.outputs.deploy_ok == 'true'
+        run: |
+          set -euo pipefail
+          echo "Rolling back production → ${{ steps.ver.outputs.stable }}"
+          curl -fsS -X POST "$MCTL_API/operations/rollback-service/execute" \
+            -H "Authorization: Bearer ${{ secrets.MCTL_GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"team_name\": \"$TEAM\",
+              \"component_name\": \"$SERVICE\",
+              \"image_tag\": \"${{ steps.ver.outputs.stable }}\"
+            }" || echo "::warning::Rollback request failed — verify production manually"
+
+      - name: Summary
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          PREVIEW_URL="${{ steps.preview.outputs.url }}"
+          {
+            echo "## Preview — ${{ steps.ver.outputs.git_tag }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| npm pre-release | \`@mashkovd/pelican-vue@${{ steps.ver.outputs.pre }}\` |"
+            echo "| image tag | \`${{ steps.ver.outputs.git_tag }}\` |"
+            if [ -n "$PREVIEW_URL" ]; then
+              echo "| preview URL | $PREVIEW_URL |"
+            else
+              echo "| preview URL | _see preview-deploy step output_ |"
+            fi
+            echo "| production rolled back to | \`${{ steps.ver.outputs.stable }}\` |"
+            echo "| TTL | 72 h |"
+          } >> "$GITHUB_STEP_SUMMARY"
