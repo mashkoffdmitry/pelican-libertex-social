@@ -326,7 +326,7 @@ jobs:
             sleep 20
             status=$(curl -fsS "$MCTL_API/workflows/$WF" \
               -H "Authorization: Bearer ${{ secrets.MCTL_GITHUB_TOKEN }}" \
-              | jq -r '.status // .phase // "Unknown"')
+              | jq -r '.live.status.phase // "Unknown"')
             echo "[$i/24] $WF → $status"
             if [ "$status" = "Succeeded" ]; then
               echo "deploy_ok=true" >> "$GITHUB_OUTPUT"
@@ -353,7 +353,7 @@ jobs:
               \"team_name\": \"$TEAM\",
               \"component_name\": \"$SERVICE\",
               \"image_tag\": \"${{ steps.ver.outputs.git_tag }}\",
-              \"ttl_hours\": 72
+              \"ttl_hours\": \"72\"
             }")
           echo "response: $response"
           url=$(echo "$response" | jq -r '.url // .preview_url // .previewUrl // empty')
