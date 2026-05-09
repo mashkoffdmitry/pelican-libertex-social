@@ -697,6 +697,20 @@ const server = http.createServer((req, res) => {
         getFull(env.ACCESS_TOKEN).catch(()=>{});
         return;
       }
+      // Cold start: both items and partial are null, but build is in progress. Return empty
+      // array immediately and let client poll again. This prevents request from blocking
+      // while waiting for the full build to complete.
+      if (fullCache.building) {
+        sendCompressed(req, res, Buffer.from(JSON.stringify([])), 200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=5',
+          'X-Catalog-Building': '1',
+          'X-Catalog-Size': '0',
+          'X-Catalog-Loaded': String(fullCache.progress.loaded),
+        });
+        return;
+      }
     }
     getFull(env.ACCESS_TOKEN).then(items => {
       const out = onlyEnabled(items);
