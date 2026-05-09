@@ -13,6 +13,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libertex Social — Trader Profile</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css" rel="stylesheet">
   <style>
@@ -827,6 +828,19 @@ const server = http.createServer((req, res) => {
       return fs.createReadStream(file).pipe(res);
     }
     res.writeHead(404); return res.end('not found');
+  }
+
+  // ---- /favicon.svg ----
+  if (u.pathname === '/favicon.svg') {
+    const faviconPath = path.join(ROOT, 'favicon.svg');
+    try {
+      const svg = fs.readFileSync(faviconPath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(svg);
+    } catch (e) {
+      res.writeHead(404);
+      return res.end('not found');
+    }
   }
 
   // ---- root landing ----
