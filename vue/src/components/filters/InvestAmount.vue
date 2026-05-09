@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../../composables/useI18n';
 import { fmtAUM } from '../../utils/format';
 import { rawFromBalance } from '../../utils/scales';
 
@@ -12,8 +13,10 @@ const emit = defineEmits<{
   (e: 'apply', balance: { min: number; max: number } | null): void;
 }>();
 
+const { t } = useI18n();
+
 const display = computed(() =>
-  props.modelValue == null ? 'any' : fmtAUM(props.modelValue),
+  props.modelValue == null ? t('filters.any') : fmtAUM(props.modelValue),
 );
 
 function onChange(e: Event) {
@@ -37,14 +40,14 @@ function onChange(e: Event) {
 <template>
   <div class="pelican-fgroup">
     <div class="title-row">
-      <label class="title">Your Investment Amount, $</label>
+      <label class="title">{{ t('filters.investAmount') }}</label>
       <span class="val">{{ display }}</span>
     </div>
     <input
       type="number"
       :min="50"
       :step="50"
-      placeholder="e.g. 5000"
+      :placeholder="t('filters.investPlaceholder')"
       autocomplete="off"
       :value="modelValue ?? ''"
       @change="onChange"

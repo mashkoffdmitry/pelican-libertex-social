@@ -10,6 +10,8 @@ import { useFilters } from './composables/useFilters';
 import { useSort } from './composables/useSort';
 import { usePagination } from './composables/usePagination';
 import { useSignals } from './composables/useSignals';
+import { provideI18n } from './composables/useI18n';
+import type { Lang } from './i18n/translations';
 import { defaultFilters, type FiltersState } from './types/filters';
 import type { Strategy } from './types/strategy';
 import type { ThemeMode } from './types/columns';
@@ -34,6 +36,11 @@ const props = withDefaults(
      */
     catalogBase?: string;
     theme?: ThemeMode;
+    /**
+     * UI language. Persists in localStorage['pelican-lang']. The toggle
+     * in the header cycles between supported languages at runtime.
+     */
+    lang?: Lang;
     defaultSort?: SortKey;
     defaultFilters?: Partial<FiltersState>;
     columns?: ColumnKey[]; // reserved; not yet wired through
@@ -42,6 +49,7 @@ const props = withDefaults(
   }>(),
   {
     theme: 'auto',
+    lang: 'en',
     defaultSort: 'return-desc',
     locale: 'en-US',
     pageSize: PAGE_SIZE,
@@ -50,6 +58,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:theme', m: ThemeMode): void;
+  (e: 'update:lang', l: Lang): void;
   (e: 'select-strategy', s: Strategy): void;
   (e: 'error', err: PelicanError): void;
 }>();
@@ -67,6 +76,14 @@ watch(
   () => props.theme,
   (t) => themeApi.setMode(t),
 );
+
+const i18n = provideI18n(props.lang);
+watch(i18n.lang, (l) => emit('update:lang', l));
+watch(
+  () => props.lang,
+  (l) => i18n.setLang(l),
+);
+const t = i18n.t;
 
 const catalog = useCatalog({
   apiBase: apiBaseRef,
@@ -134,8 +151,11 @@ onMounted(() => catalog.start());
   <div class="pelican-libsoc" :data-theme="themeApi.resolved.value">
     <header class="brand-row">
       <slot name="brand">
-        <div class="default-brand">Libertex Social — Copy Trading</div>
+        <div class="default-brand">{{ t('app.brand') }}</div>
       </slot>
+      <button class="lang-toggle" type="button" :title="i18n.lang.value" @click="i18n.cycleLang">
+        {{ i18n.lang.value.toUpperCase() }}
+      </button>
       <button class="theme-toggle" type="button" :title="themeApi.mode.value" @click="themeApi.cycle">
         <span aria-hidden="true">{{ themeApi.resolved.value === 'dark' ? '🌙' : '☀️' }}</span>
       </button>
@@ -186,7 +206,7 @@ onMounted(() => catalog.start());
         @go="onPageGo"
       >
         <template #empty>
-          <slot name="empty">No matches.</slot>
+          <slot name="empty">{{ t('table.empty') }}</slot>
         </template>
         <template #row-actions="slotProps">
           <slot name="row-actions" v-bind="slotProps" />
@@ -209,9 +229,8 @@ onMounted(() => catalog.start());
   font-weight: 700;
   color: var(--text);
 }
+.lang-toggle,
 .theme-toggle {
-  margin-left: auto;
-  width: 38px;
   height: 38px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -219,8 +238,19 @@ onMounted(() => catalog.start());
   color: var(--text);
   cursor: pointer;
   font: inherit;
+}
+.lang-toggle {
+  margin-left: auto;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.theme-toggle {
+  width: 38px;
   font-size: 16px;
 }
+.lang-toggle:hover,
 .theme-toggle:hover {
   border-color: var(--orange);
 }

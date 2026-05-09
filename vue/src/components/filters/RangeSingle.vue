@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../../composables/useI18n';
 
 const props = withDefaults(
   defineProps<{
@@ -19,6 +20,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: number | null): void }>();
 
+const { t } = useI18n();
+
 const anyAt = computed(() => props.anyAt ?? props.min);
 const inverted = computed(() => !!props.inverted);
 
@@ -28,7 +31,7 @@ const raw = computed<number>(() => {
 });
 
 const display = computed(() => {
-  if (props.modelValue == null) return 'any';
+  if (props.modelValue == null) return t('filters.any');
   return props.format ? props.format(props.modelValue) : String(props.modelValue);
 });
 

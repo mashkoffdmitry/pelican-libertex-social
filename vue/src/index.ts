@@ -13,3 +13,5 @@ export {
   type SortColumn,
 } from './constants/sort';
 export type { PelicanError } from './utils/http';
+export { useI18n, provideI18n, I18N_KEY, type I18nApi } from './composables/useI18n';
+export type { Lang, TranslationKey } from './i18n/translations';

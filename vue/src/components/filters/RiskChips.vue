@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from '../../composables/useI18n';
 import type { RiskLevel } from '../../types/strategy';
 
 const props = defineProps<{ modelValue: Set<RiskLevel> }>();
 const emit = defineEmits<{ (e: 'update:modelValue', v: Set<RiskLevel>): void }>();
+
+const { t } = useI18n();
 
 const LEVELS: RiskLevel[] = ['Low', 'Medium', 'High'];
 
@@ -24,7 +27,7 @@ function toggle(level: RiskLevel) {
       :class="['risk-' + l.toLowerCase(), { on: modelValue.has(l) }]"
       @click="toggle(l)"
     >
-      {{ l }}
+      {{ t(`risk.${l}`) }}
     </button>
   </div>
 </template>

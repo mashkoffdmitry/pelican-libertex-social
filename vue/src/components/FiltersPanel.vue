@@ -4,10 +4,13 @@ import RiskChips from './filters/RiskChips.vue';
 import RangeSingle from './filters/RangeSingle.vue';
 import RangeDual from './filters/RangeDual.vue';
 import InvestAmount from './filters/InvestAmount.vue';
+import { useI18n } from '../composables/useI18n';
 import type { FiltersState } from '../types/filters';
 import type { RiskLevel } from '../types/strategy';
 import { fmtAUM, fmtRetMag } from '../utils/format';
 import { balanceFromRaw, returnFromRaw } from '../utils/scales';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   filters: FiltersState;
@@ -84,8 +87,8 @@ function applyInvest(range: { min: number; max: number } | null) {
 <template>
   <aside class="pelican-filters" :class="{ open }">
     <div class="ftitle-row">
-      <label class="ftitle">Risk</label>
-      <button class="btn-reset" type="button" @click="emit('reset')">reset filters</button>
+      <label class="ftitle">{{ t('filters.risk') }}</label>
+      <button class="btn-reset" type="button" @click="emit('reset')">{{ t('filters.reset') }}</button>
     </div>
     <RiskChips :model-value="filters.risk" @update:model-value="setRisk" />
 
@@ -96,7 +99,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeDual
-      label="Return %"
+      :label="t('filters.return')"
       :model-value-min="retRawMin"
       :model-value-max="retRawMax"
       :format-raw="(v) => fmtRetMag(v)"
@@ -108,7 +111,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Max Drawdown ≤"
+      :label="t('filters.maxDD')"
       :model-value="filters.ddMax"
       :min="0"
       :max="100"
@@ -120,7 +123,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeDual
-      label="Balance"
+      :label="t('filters.balance')"
       :model-value-min="balRawMin"
       :model-value-max="balRawMax"
       :format-raw="(v) => fmtAUM(v)"
@@ -132,7 +135,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Mgmt Fee ≤"
+      :label="t('filters.mgmtFee')"
       :model-value="filters.feeMax"
       :min="0"
       :max="100"
@@ -144,7 +147,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Copiers AUM ≥"
+      :label="t('filters.copiersAUM')"
       :model-value="filters.aumMin"
       :min="0"
       :max="5000000"
@@ -154,7 +157,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Copiers ≥"
+      :label="t('filters.copiers')"
       :model-value="filters.copiersMin"
       :min="0"
       :max="3000"
@@ -164,7 +167,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Age ≥ (days)"
+      :label="t('filters.age')"
       :model-value="filters.ageMin"
       :min="0"
       :max="3000"
@@ -174,7 +177,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Trades ≥"
+      :label="t('filters.trades')"
       :model-value="filters.tradesMin"
       :min="0"
       :max="10000"
@@ -184,7 +187,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     />
 
     <RangeSingle
-      label="Win Rate ≥"
+      :label="t('filters.winRate')"
       :model-value="filters.winrateMin"
       :min="0"
       :max="100"
