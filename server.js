@@ -14,6 +14,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libertex Social — Trader Profile</title>
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
