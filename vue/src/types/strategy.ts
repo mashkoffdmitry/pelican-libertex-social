@@ -31,7 +31,7 @@ export interface Strategy {
   MaxDD: number | null;
   RealisedPnl: number | null;
   UnrealisedPnl: number | null;
-  History: HistoryPoint[];
+  History?: HistoryPoint[];
   TradesTotal: number;
   Wins: number;
   Losses: number;

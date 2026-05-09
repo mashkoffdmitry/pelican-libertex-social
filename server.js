@@ -6,7 +6,7 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.3.1';
+const PKG_VERSION = '0.3.2';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -256,10 +256,6 @@ function loadCatalogFromDisk() {
 function compactStrategy(meta, stats, base) {
   const inc = stats?.Profitability?.Inception || {};
   const tr  = stats?.Trades?.Inception || {};
-  // strip History to ~24 points to keep payload small
-  const hist = inc.History || [];
-  const stride = hist.length > 60 ? Math.ceil(hist.length / 60) : 1;
-  const trimmed = hist.filter((_, i) => i % stride === 0 || i === hist.length - 1);
   // Fallback chain: today's fresh fetch → previous catalog value → null. So a transient
   // upstream blip during the daily rebuild keeps yesterday's data instead of nuking the row.
   return {
@@ -278,7 +274,6 @@ function compactStrategy(meta, stats, base) {
     MaxDD: inc.MaxDrawdown != null ? inc.MaxDrawdown * 100 : (base.MaxDD ?? null),
     RealisedPnl: inc.RealisedPnl ?? base.RealisedPnl ?? null,
     UnrealisedPnl: inc.UnrealisedPnl ?? base.UnrealisedPnl ?? null,
-    History: trimmed.length ? trimmed : (Array.isArray(base.History) ? base.History : []),
     TradesTotal: tr.Total ?? base.TradesTotal ?? 0,
     Wins: tr.Wins ?? base.Wins ?? 0,
     Losses: tr.Losses ?? base.Losses ?? 0,

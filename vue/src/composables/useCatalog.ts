@@ -126,7 +126,7 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
   async function enrichOne(id: number) {
     if (enrichInflight.has(id)) return;
     const existing = byIdRef.value.get(id);
-    if (existing?._enrichAttempted && existing._meta && existing._stats) return;
+    if (existing?._enrichAttempted && existing._meta && existing._stats && existing.History?.length) return;
     enrichInflight.add(id);
     try {
       const [meta, stats] = await Promise.all([

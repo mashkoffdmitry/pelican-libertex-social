@@ -43,6 +43,18 @@ const rangeText = computed(() => {
   return `${loLabel.value} – ${hiLabel.value}`;
 });
 
+const loPct = computed(() => ((lo.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
+const hiPct = computed(() => ((hi.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
+const trackStyle = computed(() => ({
+  background: `linear-gradient(to right,
+    var(--track-bg, #e2e8f0) 0%,
+    var(--track-bg, #e2e8f0) ${loPct.value}%,
+    var(--accent, #3b82f6) ${loPct.value}%,
+    var(--accent, #3b82f6) ${hiPct.value}%,
+    var(--track-bg, #e2e8f0) ${hiPct.value}%,
+    var(--track-bg, #e2e8f0) 100%)`,
+}));
+
 function onMin(e: Event) {
   let v = parseInt((e.target as HTMLInputElement).value, 10);
   if (isNaN(v)) return;
@@ -63,7 +75,7 @@ function onMax(e: Event) {
       <label class="title">{{ label }}</label>
       <span class="val">{{ rangeText }}</span>
     </div>
-    <div class="dual-track">
+    <div class="dual-track" :style="trackStyle">
       <input
         type="range"
         class="range-dual"
@@ -115,6 +127,11 @@ function onMax(e: Event) {
   height: 24px;
   display: flex;
   align-items: center;
+  border-radius: 4px;
+  /* height matches native track (~4px). Applied via background-size so it aligns vertically */
+  background-size: 100% 4px;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .dual-track .range-dual {
   position: absolute;
@@ -123,6 +140,9 @@ function onMax(e: Event) {
   background: transparent;
   pointer-events: auto;
 }
+.range-dual::-webkit-slider-runnable-track { background: transparent; }
+.range-dual::-moz-range-track             { background: transparent; }
+.range-dual::-moz-range-progress          { background: transparent; }
 .scale {
   display: flex;
   justify-content: space-between;

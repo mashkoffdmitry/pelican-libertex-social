@@ -80,6 +80,10 @@ const pagination = usePagination<Strategy>(sortApi.sorted, props.pageSize);
 
 const signals = useSignals(apiBaseRef);
 
+watch(pagination.pageItems, (items) => {
+  items.forEach((s) => { if (!s.History?.length) void catalog.enrichOne(s.Id); });
+}, { immediate: true });
+
 const expanded = reactive(new Set<number>());
 const filtersOpen = ref(false);
 const investAmount = ref<number | null>(null);
