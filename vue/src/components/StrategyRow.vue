@@ -97,7 +97,7 @@ function toggleClosed() {
     <div class="c-num" data-label="Fee">{{ fmtFee(s) }}</div>
     <div class="c-link" @click.stop>
       <a class="signal-link" :href="link" target="_blank" rel="noopener" @click.stop>
-        Get connected
+        Subscribe
       </a>
       <slot name="row-actions" :strategy="s" />
     </div>
