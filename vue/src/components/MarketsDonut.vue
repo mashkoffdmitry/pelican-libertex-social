@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../composables/useI18n';
 import type { MarketSlice } from '../types/strategy';
 import { donutGeometry } from '../utils/svg';
 
@@ -12,12 +13,14 @@ const props = withDefaults(
   { width: 520, height: 280 },
 );
 
+const { t } = useI18n();
+
 const empty = computed(() => !props.markets || props.markets.length === 0);
 const geom = computed(() => donutGeometry(props.markets, props.width, props.height));
 </script>
 
 <template>
-  <span v-if="empty" class="dim">no market data</span>
+  <span v-if="empty" class="dim">{{ t('donut.empty') }}</span>
   <svg
     v-else
     class="pelican-donut"
@@ -25,7 +28,7 @@ const geom = computed(() => donutGeometry(props.markets, props.width, props.heig
     width="100%"
     preserveAspectRatio="xMidYMid meet"
     role="img"
-    aria-label="Markets donut chart"
+    :aria-label="t('expanded.markets')"
   >
     <g>
       <path

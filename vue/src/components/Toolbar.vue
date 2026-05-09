@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { useDebounce } from '../composables/useDebounce';
+import { useI18n } from '../composables/useI18n';
 import { SEARCH_DEBOUNCE_MS } from '../constants/defaults';
-import { SORT_KEYS, SORT_LABELS, type SortKey } from '../constants/sort';
+import { SORT_KEYS, type SortKey } from '../constants/sort';
+import { LOCALE_KEY } from '../injection-keys';
 
 const props = defineProps<{
   search: string;
@@ -39,34 +41,41 @@ function onSearchInput(e: Event) {
 function onSort(e: Event) {
   emit('update:sortKey', (e.target as HTMLSelectElement).value as SortKey);
 }
+
+const { t } = useI18n();
+const numLocale = inject(LOCALE_KEY, 'en-US');
+const countsHtml = computed(() =>
+  t('toolbar.counts.html', {
+    filtered: props.filteredTotal.toLocaleString(numLocale),
+    total: props.total.toLocaleString(numLocale),
+    page: props.page,
+    totalPages: props.totalPages,
+  }),
+);
 </script>
 
 <template>
   <div class="pelican-toolbar">
     <button class="btn-flat filters-toggle" type="button" @click="emit('toggle-filters')">
-      Filters
+      {{ t('toolbar.filters') }}
     </button>
-    <div class="counts">
-      Showing <b>{{ filteredTotal.toLocaleString('en-US') }}</b>
-      of <b>{{ total.toLocaleString('en-US') }}</b>
-      · page <b>{{ page }}</b> / {{ totalPages }}
-    </div>
+    <div class="counts" v-html="countsHtml" />
     <input
       class="search"
       type="search"
-      placeholder="Search by signal name…"
+      :placeholder="t('toolbar.search.placeholder')"
       autocomplete="off"
       :value="local"
       @input="onSearchInput"
     />
     <div class="sort">
-      <label>Sort:</label>
+      <label>{{ t('toolbar.sort') }}</label>
       <select :value="sortKey" @change="onSort">
-        <option v-for="k in SORT_KEYS" :key="k" :value="k">{{ SORT_LABELS[k] }}</option>
+        <option v-for="k in SORT_KEYS" :key="k" :value="k">{{ t(`sort.${k}`) }}</option>
       </select>
     </div>
-    <button class="btn-flat" type="button" title="reload" @click="emit('refresh')">
-      ↻ reload
+    <button class="btn-flat" type="button" :title="t('toolbar.reload.title')" @click="emit('refresh')">
+      {{ t('toolbar.reload') }}
     </button>
   </div>
 </template>

@@ -3,12 +3,12 @@ import { computed, inject, ref } from 'vue';
 import Sparkline from './Sparkline.vue';
 import MarketsDonut from './MarketsDonut.vue';
 import TradesPanel from './TradesPanel.vue';
+import { useI18n } from '../composables/useI18n';
 import type { Strategy } from '../types/strategy';
 import type { SignalKind } from '../types/api';
 import {
   ageDays,
-  fmtAge,
-  fmtFee,
+  fmtFee as fmtFeeRaw,
   fmtMoney,
   fmtMoneyFull,
   fmtNum,
@@ -32,6 +32,7 @@ const emit = defineEmits<{
 }>();
 
 const locale = inject(LOCALE_KEY, 'en-US');
+const { t } = useI18n();
 
 const ret = computed(() => fmtPct(props.s.Return, 1));
 const dd = computed(() => (props.s.MaxDD != null ? fmtPct(props.s.MaxDD, 2) : null));
@@ -42,6 +43,25 @@ const profileName = computed(
   () => props.s.Profile?.Name ?? (props.s.Profile?.Id ? '#' + props.s.Profile.Id : ''),
 );
 const link = computed(() => `https://libertex.copy-trade.io/strategy/${props.s.Id}`);
+
+// Localised wrappers around format.ts helpers — those are language-agnostic and
+// return literal "free" / "5d" / "3mo". Translate at the call site so that
+// switching language reactively updates the rendered text.
+function fmtFee(s: Strategy): string {
+  const raw = fmtFeeRaw(s);
+  return raw === 'free' ? t('row.free') : raw;
+}
+function fmtAgeI18n(days: number | null): string {
+  if (days == null) return '—';
+  if (days < 30) return t('fmt.age.days', { n: days });
+  const months = Math.floor(days / 30);
+  if (months < 12) return t('fmt.age.months', { n: months });
+  const years = Math.floor(days / 365);
+  const remMonths = Math.floor((days - years * 365) / 30);
+  return remMonths
+    ? t('fmt.age.yearsAndMonths', { y: years, m: remMonths })
+    : t('fmt.age.years', { n: years });
+}
 
 const showOpen = ref(false);
 const showClosed = ref(false);
@@ -74,30 +94,30 @@ function toggleClosed() {
       <div class="nm">
         <div class="title">
           {{ s.Name || '#' + s.Id }}
-          <span v-if="s._meta && s.Fee == null" class="free-badge">free</span>
+          <span v-if="s._meta && s.Fee == null" class="free-badge">{{ t('row.free') }}</span>
         </div>
         <div class="by">{{ profileName }}</div>
       </div>
     </div>
-    <div class="c-spark" data-label="Equity curve">
+    <div class="c-spark" :data-label="t('row.dataLabel.equityCurve')">
       <Sparkline :history="s.History" />
     </div>
-    <div class="c-num" data-label="Return">
+    <div class="c-num" :data-label="t('row.dataLabel.return')">
       <span v-if="ret" :class="ret.positive ? 'green' : 'red'">{{ ret.text }}</span>
       <span v-else>—</span>
     </div>
-    <div class="c-num" data-label="Copiers">{{ fmtNum(s.NumCopiers, locale) }}</div>
-    <div class="c-num" data-label="Copiers AUM">{{ fmtMoney(s.CopiersAUM, locale) }}</div>
-    <div class="c-num" data-label="Max DD">
+    <div class="c-num" :data-label="t('row.dataLabel.copiers')">{{ fmtNum(s.NumCopiers, locale) }}</div>
+    <div class="c-num" :data-label="t('row.dataLabel.copiersAUM')">{{ fmtMoney(s.CopiersAUM, locale) }}</div>
+    <div class="c-num" :data-label="t('row.dataLabel.maxDD')">
       <span v-if="dd" :class="dd.positive ? 'green' : 'red'">{{ dd.text }}</span>
       <span v-else>—</span>
     </div>
-    <div class="c-num" data-label="Age">{{ fmtAge(age) }}</div>
-    <div class="c-num" data-label="Balance">{{ fmtMoney(s.AccountBalance, locale) }}</div>
-    <div class="c-num" data-label="Fee">{{ fmtFee(s) }}</div>
+    <div class="c-num" :data-label="t('row.dataLabel.age')">{{ fmtAgeI18n(age) }}</div>
+    <div class="c-num" :data-label="t('row.dataLabel.balance')">{{ fmtMoney(s.AccountBalance, locale) }}</div>
+    <div class="c-num" :data-label="t('row.dataLabel.fee')">{{ fmtFee(s) }}</div>
     <div class="c-link" @click.stop>
       <a class="signal-link" :href="link" target="_blank" rel="noopener" @click.stop>
-        Subscribe
+        {{ t('row.subscribe') }}
       </a>
       <slot name="row-actions" :strategy="s" />
     </div>
@@ -106,15 +126,15 @@ function toggleClosed() {
   <div v-if="expanded" class="pelican-row-expanded" @click.stop>
     <div class="grid">
       <div class="col-stats">
-        <div class="field"><div class="label">Currency</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
-        <div class="field"><div class="label">Monthly profit</div><div class="value">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
-        <div class="field"><div class="label">Yearly profit</div><div class="value">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
-        <div class="field"><div class="label">Balance</div><div class="value">{{ fmtMoneyFull(s.AccountBalance, locale) }}</div></div>
-        <div class="field"><div class="label">Realized P/L</div><div class="value">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
-        <div class="field"><div class="label">Unrealized P/L</div><div class="value">{{ fmtMoneyFull(s.UnrealisedPnl, locale) }}</div></div>
-        <div class="field"><div class="label">Trades total</div><div class="value">{{ fmtNum(s.TradesTotal, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.currency') }}</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.monthlyProfit') }}</div><div class="value">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.yearlyProfit') }}</div><div class="value">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.balance') }}</div><div class="value">{{ fmtMoneyFull(s.AccountBalance, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.realizedPnl') }}</div><div class="value">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.unrealizedPnl') }}</div><div class="value">{{ fmtMoneyFull(s.UnrealisedPnl, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.tradesTotal') }}</div><div class="value">{{ fmtNum(s.TradesTotal, locale) }}</div></div>
         <div class="field">
-          <div class="label">Win rate</div>
+          <div class="label">{{ t('expanded.winRate') }}</div>
           <div class="value">
             <span v-if="wr >= 0">{{ wr.toFixed(1) }}% / {{ lr.toFixed(1) }}%</span>
             <span v-else class="dim">—</span>
@@ -122,17 +142,17 @@ function toggleClosed() {
         </div>
       </div>
       <div class="col-donut">
-        <div class="hd">Markets</div>
+        <div class="hd">{{ t('expanded.markets') }}</div>
         <MarketsDonut :markets="s.Markets" />
       </div>
     </div>
 
     <div class="trade-toggles">
       <button class="pill" :class="{ on: showOpen }" type="button" @click="toggleOpen">
-        {{ showOpen ? 'Hide' : 'Open Trades' }}
+        {{ showOpen ? t('trades.hide') : t('trades.openTrades') }}
       </button>
       <button class="pill" :class="{ on: showClosed }" type="button" @click="toggleClosed">
-        {{ showClosed ? 'Hide' : 'Trade History' }}
+        {{ showClosed ? t('trades.hide') : t('trades.tradeHistory') }}
       </button>
     </div>
 

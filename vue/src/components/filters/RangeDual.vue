@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../../composables/useI18n';
 
 const props = defineProps<{
   label: string;
@@ -23,6 +24,8 @@ const emit = defineEmits<{
   (e: 'update:modelValueMax', v: number | null): void;
 }>();
 
+const { t } = useI18n();
+
 const rawMin = computed(() => props.rawMin ?? 0);
 const rawMax = computed(() => props.rawMax ?? 100);
 
@@ -30,16 +33,18 @@ const lo = computed(() => props.modelValueMin ?? rawMin.value);
 const hi = computed(() => props.modelValueMax ?? rawMax.value);
 
 const loLabel = computed(() =>
-  lo.value <= rawMin.value ? (props.minLabel ?? 'any') : props.formatRaw(props.rawToDomain(lo.value)),
+  lo.value <= rawMin.value
+    ? (props.minLabel ?? t('filters.any'))
+    : props.formatRaw(props.rawToDomain(lo.value)),
 );
 const hiLabel = computed(() =>
   hi.value >= rawMax.value
-    ? (props.maxLabel ?? 'any')
+    ? (props.maxLabel ?? t('filters.any'))
     : props.formatRaw(props.rawToDomain(hi.value)),
 );
 
 const rangeText = computed(() => {
-  if (lo.value <= rawMin.value && hi.value >= rawMax.value) return 'any';
+  if (lo.value <= rawMin.value && hi.value >= rawMax.value) return t('filters.any');
   return `${loLabel.value} – ${hiLabel.value}`;
 });
 

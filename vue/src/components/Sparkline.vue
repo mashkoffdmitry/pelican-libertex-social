@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../composables/useI18n';
 import { sparklineGeometry } from '../utils/svg';
 import type { HistoryPoint } from '../types/strategy';
 
@@ -12,6 +13,8 @@ const props = withDefaults(
   { width: 140, height: 34 },
 );
 
+const { t } = useI18n();
+
 const geom = computed(() => sparklineGeometry(props.history, props.width, props.height));
 </script>
 
@@ -22,9 +25,9 @@ const geom = computed(() => sparklineGeometry(props.history, props.width, props.
     :width="geom.width"
     :height="geom.height"
     role="img"
-    aria-label="No equity data"
+    :aria-label="t('spark.empty')"
   >
-    <text x="2" y="20" font-size="11" fill="var(--spark-no-data)">no data</text>
+    <text x="2" y="20" font-size="11" fill="var(--spark-no-data)">{{ t('spark.empty') }}</text>
   </svg>
   <svg
     v-else
@@ -34,7 +37,7 @@ const geom = computed(() => sparklineGeometry(props.history, props.width, props.
     :viewBox="`0 0 ${geom.width} ${geom.height}`"
     preserveAspectRatio="none"
     role="img"
-    aria-label="Equity curve"
+    :aria-label="t('table.equityCurve')"
   >
     <line
       x1="0"

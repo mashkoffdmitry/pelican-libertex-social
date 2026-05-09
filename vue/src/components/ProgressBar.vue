@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../composables/useI18n';
 
 const props = defineProps<{
   loaded: number;
   total: number;
   active: boolean;
 }>();
+
+const { t } = useI18n();
 
 const pct = computed(() =>
   props.total > 0 ? Math.min(100, (props.loaded / props.total) * 100) : 0,
@@ -15,7 +18,7 @@ const pct = computed(() =>
 <template>
   <div v-if="active" class="pelican-progress">
     <div class="bar"><span :style="{ width: pct.toFixed(1) + '%' }" /></div>
-    <div class="caption">Refreshing strategy data&thinsp;·&thinsp;{{ pct.toFixed(0) }}%</div>
+    <div class="caption">{{ t('progress.refreshing') }}&thinsp;·&thinsp;{{ pct.toFixed(0) }}%</div>
   </div>
 </template>
 

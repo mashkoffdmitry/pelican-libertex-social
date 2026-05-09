@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import StrategyRow from './StrategyRow.vue';
 import Pager from './Pager.vue';
+import { useI18n } from '../composables/useI18n';
 import type { Strategy, Trade } from '../types/strategy';
 import type { SignalKind } from '../types/api';
 import type { SortColumn, SortKey } from '../constants/sort';
@@ -24,15 +26,18 @@ const emit = defineEmits<{
   (e: 'go', target: number | 'prev' | 'next'): void;
 }>();
 
-const SORTABLE: { key: SortColumn; label: string }[] = [
-  { key: 'return', label: 'Return %' },
-  { key: 'copiers', label: 'Copiers' },
-  { key: 'aum', label: 'Copiers AUM' },
-  { key: 'dd', label: 'Max Drawdown' },
-  { key: 'age', label: 'Age' },
-  { key: 'balance', label: 'Balance' },
-  { key: 'fee', label: 'Mgmt Fee %' },
-];
+const { t } = useI18n();
+
+// Computed (not const) so labels reactively re-render on language change.
+const sortable = computed<{ key: SortColumn; label: string }[]>(() => [
+  { key: 'return', label: t('table.return') },
+  { key: 'copiers', label: t('table.copiers') },
+  { key: 'aum', label: t('table.copiersAUM') },
+  { key: 'dd', label: t('table.maxDrawdown') },
+  { key: 'age', label: t('table.age') },
+  { key: 'balance', label: t('table.balance') },
+  { key: 'fee', label: t('table.mgmtFee') },
+]);
 
 function sortClass(col: SortColumn): string {
   if (props.sortKey === `${col}-asc`) return 'active-asc';
@@ -44,10 +49,10 @@ function sortClass(col: SortColumn): string {
 <template>
   <section class="pelican-table">
     <div class="row head">
-      <div>Name</div>
-      <div>Equity curve</div>
+      <div>{{ t('table.name') }}</div>
+      <div>{{ t('table.equityCurve') }}</div>
       <div
-        v-for="col in SORTABLE"
+        v-for="col in sortable"
         :key="col.key"
         class="c-num sortable"
         :class="sortClass(col.key)"
@@ -59,7 +64,7 @@ function sortClass(col: SortColumn): string {
     </div>
 
     <div v-if="pageItems.length === 0" class="empty">
-      <slot name="empty">No matches.</slot>
+      <slot name="empty">{{ t('table.empty') }}</slot>
     </div>
     <template v-else>
       <StrategyRow

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from '../composables/useI18n';
 import type { SignalKind } from '../types/api';
 import type { Trade } from '../types/strategy';
 import { fmtTradeTime, fmtMoneyFull } from '../utils/format';
@@ -11,7 +12,11 @@ const props = defineProps<{
   locale: string;
 }>();
 
-const title = computed(() => (props.kind === 'open' ? 'Open Trades' : 'Trade History (30d)'));
+const { t } = useI18n();
+
+const title = computed(() =>
+  props.kind === 'open' ? t('tradesPanel.openTrades') : t('tradesPanel.tradeHistory'),
+);
 const empty = computed(
   () => !props.loading && (props.trades == null || props.trades.length === 0),
 );
@@ -20,8 +25,8 @@ const empty = computed(
 <template>
   <div class="pelican-trades">
     <div class="hd">{{ title }}</div>
-    <div v-if="loading" class="dim">Loading…</div>
-    <div v-else-if="empty" class="dim">No trades.</div>
+    <div v-if="loading" class="dim">{{ t('tradesPanel.loading') }}</div>
+    <div v-else-if="empty" class="dim">{{ t('tradesPanel.empty') }}</div>
     <ul v-else class="list">
       <li v-for="(t, i) in trades ?? []" :key="i">
         <span class="market">{{ t.MarketName ?? '—' }}</span>
