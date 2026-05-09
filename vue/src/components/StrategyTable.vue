@@ -94,49 +94,130 @@ function sortClass(col: SortColumn): string {
 </template>
 
 <style scoped>
+/* ----- Table card (frosted glass) ----- */
 .pelican-table {
-  flex: 1;
+  background: rgba(24, 28, 34, .55);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+          backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    inset 0 -1px 0 rgba(0, 0, 0, .18);
+  position: relative;
   min-width: 0;
 }
+:global(.pelican-libsoc[data-theme="light"]) .pelican-table {
+  background: rgba(255, 255, 255, .62);
+  border-color: rgba(0, 0, 0, .06);
+  box-shadow:
+    0 8px 32px rgba(20, 30, 20, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .85),
+    inset 0 -1px 0 rgba(0, 0, 0, .04);
+}
+.pelican-table::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: .06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.7 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ----- Head row (frosted, dim sage tint) ----- */
 .row.head {
   display: grid;
-  grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) auto;
+  grid-template-columns:
+    minmax(180px, 1.6fr)  /* name */
+    minmax(120px, 1.1fr)  /* sparkline */
+    100px                 /* return */
+    80px                  /* copiers */
+    120px                 /* AUM */
+    100px                 /* maxDD */
+    70px                  /* age */
+    100px                 /* balance */
+    80px                  /* fee */
+    104px;                /* signal link */
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--sage-2);
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  padding: 14px 20px;
+  background: rgba(42, 52, 51, .50);
+  -webkit-backdrop-filter: blur(8px);
+          backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  font-size: 13px;
   font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--text);
+  letter-spacing: .1px;
+  position: relative;
+  z-index: 1;
 }
+:global(.pelican-libsoc[data-theme="light"]) .row.head {
+  background: rgba(220, 225, 220, .55);
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
+}
+
 .row.head .c-num {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   text-align: right;
 }
 .row.head .sortable {
   cursor: pointer;
   user-select: none;
+  transition: color .2s;
 }
-.row.head .sortable:hover {
-  color: var(--text);
+.row.head .sortable:hover { color: var(--orange); }
+.row.head .sortable::after {
+  content: '⇅';
+  font-size: 10px;
+  color: var(--muted-2);
+  transition: color .2s, transform .2s;
 }
-.row.head .sortable.active-asc::after {
-  content: ' ↑';
-  color: var(--orange);
-}
-.row.head .sortable.active-desc::after {
-  content: ' ↓';
-  color: var(--orange);
-}
+.row.head .sortable.active-asc::after  { content: '↑'; color: var(--orange); }
+.row.head .sortable.active-desc::after { content: '↓'; color: var(--orange); }
+
 .empty {
   padding: 60px 20px;
   text-align: center;
   color: var(--muted);
+  position: relative;
+  z-index: 1;
 }
-@media (max-width: 720px) {
+
+/* ---- compact desktop ---- */
+@media (max-width: 1700px) {
   .row.head {
-    display: none;
+    grid-template-columns:
+      minmax(140px, 1.4fr)
+      minmax(95px, 1fr)
+      78px 62px 97px 82px 50px 85px 62px 105px;
+    padding: 12px 14px;
+    gap: 10px;
+    font-size: 12px;
   }
+}
+
+/* ---- below ~1340: tighter columns ---- */
+@media (max-width: 1340px) {
+  .row.head {
+    grid-template-columns:
+      minmax(140px, 1.3fr)
+      minmax(85px, 0.9fr)
+      70px 55px 90px 75px 50px 80px 55px 92px;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+}
+
+/* ---- mobile: hide head, rows render as cards ---- */
+@media (max-width: 720px) {
+  .pelican-table { border-radius: 10px; }
+  .row.head { display: none; }
 }
 </style>

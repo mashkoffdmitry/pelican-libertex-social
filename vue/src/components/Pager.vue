@@ -41,47 +41,90 @@ function onGoto(e: Event) {
 .pelican-pager {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 6px;
-  padding: 16px 0;
+  justify-content: center;
+  align-items: center;
+  margin: 18px 0 60px;
   font-size: 13px;
 }
-.pelican-pager button {
-  background: var(--card);
-  border: 1px solid var(--line);
+.pelican-pager button,
+.pelican-pager .page {
+  min-width: 36px;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--input-bg);
   color: var(--text);
+  border: 1.5px solid var(--line);
   border-radius: 6px;
-  padding: 6px 10px;
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color .2s, color .2s,
+    transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.pelican-pager button:hover:not(:disabled),
+.pelican-pager .page:hover:not(.cur) {
+  border-color: var(--orange);
+  color: var(--orange);
+  transform: translateY(-1px);
+}
+.pelican-pager button:active:not(:disabled),
+.pelican-pager .page:active:not(.cur) {
+  transform: translateY(0);
 }
 .pelican-pager button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.pelican-pager button.page.cur {
+.pelican-pager .page.cur {
   background: var(--orange);
   color: #fff;
   border-color: var(--orange);
+  cursor: default;
 }
 .pelican-pager .gap {
-  padding: 0 4px;
   color: var(--muted);
+  padding: 0 4px;
 }
 .pelican-pager .info {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  margin-left: 8px;
+  margin-left: 10px;
 }
 .pelican-pager .info input {
   width: 64px;
   padding: 6px;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 6px;
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
+  font-size: 13px;
+}
+.pelican-pager .info input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+@media (max-width: 720px) {
+  .pelican-pager {
+    gap: 4px;
+    margin: 14px 0 40px;
+  }
+  .pelican-pager button,
+  .pelican-pager .page {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .pelican-pager .info { display: none; }
 }
 </style>

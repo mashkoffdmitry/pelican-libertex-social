@@ -112,47 +112,105 @@ function onMax(e: Event) {
 .pelican-fgroup {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 .title-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 8px;
 }
 .title {
-  font-size: 12px;
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
   color: var(--muted);
 }
 .val {
   font-size: 12px;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .dual-track {
   position: relative;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  border-radius: 4px;
-  /* height matches native track (~4px). Applied via background-size so it aligns vertically */
-  background-size: 100% 4px;
-  background-repeat: no-repeat;
-  background-position: center;
+  height: 26px;
+  padding-top: 14px;
 }
 .dual-track .range-dual {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 14px;
   width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
   background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
   pointer-events: auto;
+  outline: none;
 }
-.range-dual::-webkit-slider-runnable-track { background: transparent; }
-.range-dual::-moz-range-track             { background: transparent; }
-.range-dual::-moz-range-progress          { background: transparent; }
+.range-dual::-webkit-slider-runnable-track { background: transparent; height: 4px; }
+.range-dual::-moz-range-track             { background: transparent; height: 4px; }
+.range-dual::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 255, 255, .65) 0%, rgba(255, 255, 255, 0) 35%),
+    linear-gradient(180deg, var(--orange-2) 0%, var(--orange) 60%, #c14a23 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .45),
+    0 1px 4px rgba(0, 0, 0, .35);
+  margin-top: -7px;
+  position: relative;
+  z-index: 2;
+  transition: transform .15s, box-shadow .25s;
+}
+.range-dual:active::-webkit-slider-thumb,
+.range-dual:focus::-webkit-slider-thumb {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 6px rgba(239, 124, 70, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .45),
+    0 1px 4px rgba(0, 0, 0, .35);
+  z-index: 3;
+}
+.range-dual::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 255, 255, .65) 0%, rgba(255, 255, 255, 0) 35%),
+    linear-gradient(180deg, var(--orange-2) 0%, var(--orange) 60%, #c14a23 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .45),
+    0 1px 4px rgba(0, 0, 0, .35);
+}
 .scale {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-top: 4px;
+  font-size: 10px;
   color: var(--muted);
-  font-size: 11px;
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  pointer-events: none;
 }
+.scale span:nth-child(1) { text-align: left; }
+.scale span:nth-child(2) { text-align: center; }
+.scale span:nth-child(3) { text-align: right; }
 </style>

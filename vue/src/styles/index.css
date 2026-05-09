@@ -1,3 +1,16 @@
+/* ============================================================
+   Pelican widget — design tokens, base typography, atmospheric
+   decorations. Component-specific styles live in each .vue's
+   scoped <style> block.
+
+   All selectors are namespaced under `.pelican-libsoc` so the
+   widget is safe to drop into a host page without leaking onto
+   surrounding markup. The blob backgrounds use ::before/::after
+   on `.pelican-libsoc` itself (rather than `body`) for the same
+   reason — they decorate the widget, not the page.
+   ============================================================ */
+
+/* Light theme tokens (default) */
 .pelican-libsoc {
   --bg: #f7f7f4;
   --card: #ffffff;
@@ -27,6 +40,7 @@
   --input-bg: #ffffff;
 }
 
+/* Dark theme tokens */
 .pelican-libsoc[data-theme="dark"] {
   --bg: #0d1014;
   --card: #181c22;
@@ -64,7 +78,84 @@
 }
 
 .pelican-libsoc {
+  position: relative;
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.45 'Manrope', Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 14px/1.45 'Mont', 'Manrope', Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Atmospheric chrome-blob decorations (Figma-sourced) ----
+   Scoped to the widget so embedding in a host page doesn't paint the
+   blobs onto the host's body. */
+.pelican-libsoc::before,
+.pelican-libsoc::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: saturate(120%);
+}
+.pelican-libsoc::before {
+  background-image: url('/bg-blob.png');
+  width: 920px; height: 480px;
+  top: -140px; right: -160px;
+  transform: rotate(-12deg);
+  opacity: .42;
+}
+.pelican-libsoc::after {
+  background-image: url('/bg-blob2.png');
+  width: 780px; height: 580px;
+  bottom: -180px; left: -140px;
+  transform: rotate(18deg);
+  opacity: .30;
+}
+.pelican-libsoc[data-theme="light"]::before { opacity: .18; }
+.pelican-libsoc[data-theme="light"]::after { opacity: .12; }
+
+/* Keep app content above the decorations */
+.pelican-libsoc > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Animations ---- */
+@keyframes pelican-free-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(78,217,140,.35); }
+  50%      { box-shadow: 0 0 0 5px rgba(78,217,140,0);  }
+}
+
+@keyframes pelican-welcome-pop {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes pelican-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Body scroll-lock while WelcomeModal is open */
+html.pelican-welcome-open,
+html.pelican-welcome-open body { overflow: hidden; }
+
+/* Honor reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .pelican-libsoc *,
+  .pelican-libsoc *::before,
+  .pelican-libsoc *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Mobile blob downsize (smaller viewports → smaller decorations) */
+@media (max-width: 720px) {
+  .pelican-libsoc::before { width: 560px; height: 300px; opacity: .32; }
+  .pelican-libsoc::after  { width: 480px; height: 360px; opacity: .22; }
 }

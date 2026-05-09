@@ -7,14 +7,16 @@ export type Lang = 'en' | 'ru';
 
 const en = {
   // Brand / header
-  'app.brand': 'Libertex Social — Copy Trading',
+  'app.brand.line1': 'LIBERTEX',
+  'app.brand.line2': 'SOCIAL',
+  'app.brand.sub': 'Copy Trading',
 
   // Toolbar
   'toolbar.filters': 'Filters',
   'toolbar.search.placeholder': 'Search by signal name…',
   'toolbar.sort': 'Sort:',
   'toolbar.reload': '↻ reload',
-  'toolbar.reload.title': 'reload',
+  'toolbar.reload.title': 'reload via /api/discover',
   'toolbar.counts.html':
     'Showing <b>{filtered}</b> of <b>{total}</b> · page <b>{page}</b> / {totalPages}',
 
@@ -34,8 +36,7 @@ const en = {
   'filters.investPlaceholder': 'e.g. 5000',
   'filters.any': 'any',
 
-  // Risk chips (RiskChips renders Low/Medium/High; Unsuitable is reserved for
-  // strategies the upstream API marks as such — translated for completeness)
+  // Risk chips
   'risk.Low': 'Low',
   'risk.Medium': 'Medium',
   'risk.High': 'High',
@@ -97,7 +98,7 @@ const en = {
   'expanded.realizedPnl': 'Realized P/L',
   'expanded.unrealizedPnl': 'Unrealized P/L',
   'expanded.tradesTotal': 'Trades total',
-  'expanded.winRate': 'Win rate',
+  'expanded.winRate': 'Win Rate',
   'expanded.markets': 'Markets',
 
   // Trade-pill toggles
@@ -126,47 +127,78 @@ const en = {
   'fmt.age.months': '{n}mo',
   'fmt.age.years': '{n}y',
   'fmt.age.yearsAndMonths': '{y}y {m}mo',
+
+  // Toggles
+  'toggle.theme.title': 'Toggle dark mode',
+  'toggle.lang.title': 'Switch language',
+
+  // ----- Welcome modal (first-visit promo, suppressed for 30 min after dismiss)
+  'welcome.close': 'Close',
+  'welcome.title':
+    'Start earning more by copying the trades of professionals on Libertex',
+  'welcome.desc':
+    'Why learn from your own mistakes when you can adopt the experience of the best? Connect to successful traders, copy their strategies, and earn on the financial markets — <b>suitable even for those with no trading experience</b>. Smart trading and fast growth!',
+  'welcome.howItWorks': 'How it works',
+  'welcome.step1.title': 'Download the app',
+  'welcome.step1.desc': 'Available for iOS and Android',
+  'welcome.step2.title': 'Quick registration',
+  'welcome.step2.desc': 'Use the e-mail from your Libertex account',
+  'welcome.step3.title': 'Link your MetaTrader account',
+  'welcome.step3.desc':
+    'Copy the credentials from the «More» section in the Libertex app and paste them into the «Account» section in the Copy&nbsp;Trading app',
+  'welcome.step4.title': 'Choose a top trader',
+  'welcome.step4.desc': 'Browse profiles and pick one whose strategy fits you',
+  'welcome.step5.title': 'Automatic copying',
+  'welcome.step5.desc':
+    "The system replicates the chosen trader's deals in real time",
+  'welcome.bonus.title': 'Track the result',
+  'welcome.bonus.desc':
+    'Monitor profitability, change settings or pause at any time',
+  'welcome.cta': 'Start now',
+  'welcome.tag': "Let the experts' experience work for you!",
 };
 
 export type TranslationKey = keyof typeof en;
 
 const ru: Record<TranslationKey, string> = {
-  'app.brand': 'Libertex Social — Копи-трейдинг',
+  'app.brand.line1': 'LIBERTEX',
+  'app.brand.line2': 'SOCIAL',
+  'app.brand.sub': 'Copy Trading',
 
   'toolbar.filters': 'Фильтры',
-  'toolbar.search.placeholder': 'Поиск по названию стратегии…',
+  'toolbar.search.placeholder': 'Поиск по названию сигнала…',
   'toolbar.sort': 'Сортировка:',
   'toolbar.reload': '↻ обновить',
-  'toolbar.reload.title': 'обновить',
+  'toolbar.reload.title': 'обновить через /api/discover',
   'toolbar.counts.html':
     'Показано <b>{filtered}</b> из <b>{total}</b> · стр. <b>{page}</b> / {totalPages}',
 
   'filters.risk': 'Риск',
-  'filters.reset': 'сбросить',
+  'filters.reset': 'сбросить фильтры',
   'filters.return': 'Доходность %',
   'filters.maxDD': 'Макс. просадка ≤',
   'filters.balance': 'Баланс',
   'filters.mgmtFee': 'Комиссия ≤',
-  'filters.copiersAUM': 'AUM копирующих ≥',
-  'filters.copiers': 'Копирующих ≥',
-  'filters.age': 'Возраст ≥ (дней)',
+  'filters.copiersAUM': 'Объём копиров. ≥',
+  'filters.copiers': 'Копировщиков ≥',
+  'filters.age': 'Возраст ≥ (дн.)',
   'filters.trades': 'Сделок ≥',
-  'filters.winRate': 'Доля прибыльных ≥',
-  'filters.investAmount': 'Сумма инвестиций, $',
+  'filters.winRate': 'Win Rate ≥',
+  'filters.investAmount': 'Ваш инвест. бюджет, $',
   'filters.investPlaceholder': 'напр. 5000',
-  'filters.any': 'любая',
+  'filters.any': 'любой',
 
   'risk.Low': 'Низкий',
   'risk.Medium': 'Средний',
   'risk.High': 'Высокий',
-  'risk.Unsuitable': 'Не подходит',
+  'risk.Unsuitable': 'Неподходящий',
 
   'sort.return-desc': 'Доходность ↓',
   'sort.return-asc': 'Доходность ↑',
-  'sort.copiers-desc': 'Копирующих ↓',
-  'sort.copiers-asc': 'Копирующих ↑',
-  'sort.aum-desc': 'AUM копирующих ↓',
-  'sort.aum-asc': 'AUM копирующих ↑',
+  'sort.copiers-desc': 'Копировщики ↓',
+  'sort.copiers-asc': 'Копировщики ↑',
+  'sort.aum-desc': 'Объём ↓',
+  'sort.aum-asc': 'Объём ↑',
   'sort.dd-asc': 'Просадка ↑',
   'sort.dd-desc': 'Просадка ↓',
   'sort.fee-asc': 'Комиссия ↑',
@@ -175,29 +207,29 @@ const ru: Record<TranslationKey, string> = {
   'sort.age-asc': 'Возраст ↑',
   'sort.balance-desc': 'Баланс ↓',
   'sort.balance-asc': 'Баланс ↑',
-  'sort.winrate-desc': 'Доля прибыльных ↓',
-  'sort.winrate-asc': 'Доля прибыльных ↑',
+  'sort.winrate-desc': 'Win Rate ↓',
+  'sort.winrate-asc': 'Win Rate ↑',
   'sort.trades-desc': 'Сделок ↓',
   'sort.trades-asc': 'Сделок ↑',
-  'sort.monthly-desc': 'Прибыль за месяц ↓',
-  'sort.monthly-asc': 'Прибыль за месяц ↑',
+  'sort.monthly-desc': 'Прибыль/мес ↓',
+  'sort.monthly-asc': 'Прибыль/мес ↑',
 
   'table.name': 'Название',
-  'table.equityCurve': 'Кривая капитала',
+  'table.equityCurve': 'График доходности',
   'table.return': 'Доходность %',
-  'table.copiers': 'Копирующих',
-  'table.copiersAUM': 'AUM копирующих',
+  'table.copiers': 'Копировщики',
+  'table.copiersAUM': 'Объём копиров.',
   'table.maxDrawdown': 'Макс. просадка',
   'table.age': 'Возраст',
   'table.balance': 'Баланс',
   'table.mgmtFee': 'Комиссия %',
   'table.empty': 'Ничего не найдено.',
 
-  'row.dataLabel.equityCurve': 'Кривая капитала',
+  'row.dataLabel.equityCurve': 'График доходности',
   'row.dataLabel.return': 'Доходность',
-  'row.dataLabel.copiers': 'Копирующих',
-  'row.dataLabel.copiersAUM': 'AUM копирующих',
-  'row.dataLabel.maxDD': 'Просадка',
+  'row.dataLabel.copiers': 'Копировщики',
+  'row.dataLabel.copiersAUM': 'Объём копиров.',
+  'row.dataLabel.maxDD': 'Макс DD',
   'row.dataLabel.age': 'Возраст',
   'row.dataLabel.balance': 'Баланс',
   'row.dataLabel.fee': 'Комиссия',
@@ -209,10 +241,10 @@ const ru: Record<TranslationKey, string> = {
   'expanded.monthlyProfit': 'Прибыль за месяц',
   'expanded.yearlyProfit': 'Прибыль за год',
   'expanded.balance': 'Баланс',
-  'expanded.realizedPnl': 'Реализованная П/У',
-  'expanded.unrealizedPnl': 'Нереализованная П/У',
+  'expanded.realizedPnl': 'Реализ. P/L',
+  'expanded.unrealizedPnl': 'Нереализ. P/L',
   'expanded.tradesTotal': 'Всего сделок',
-  'expanded.winRate': 'Доля прибыльных',
+  'expanded.winRate': 'Win Rate',
   'expanded.markets': 'Рынки',
 
   'trades.hide': 'Скрыть',
@@ -226,7 +258,7 @@ const ru: Record<TranslationKey, string> = {
 
   'pager.prev': '‹ назад',
   'pager.next': 'вперёд ›',
-  'pager.goto': 'на стр.',
+  'pager.goto': 'перейти на',
 
   'progress.refreshing': 'Обновление данных',
   'donut.empty': 'нет данных по рынкам',
@@ -236,6 +268,34 @@ const ru: Record<TranslationKey, string> = {
   'fmt.age.months': '{n} мес',
   'fmt.age.years': '{n} г',
   'fmt.age.yearsAndMonths': '{y} г {m} мес',
+
+  'toggle.theme.title': 'Сменить тему',
+  'toggle.lang.title': 'Сменить язык',
+
+  'welcome.close': 'Закрыть',
+  'welcome.title':
+    'Начните зарабатывать больше, копируя сделки профессионалов в Libertex',
+  'welcome.desc':
+    'Зачем учиться на своих ошибках, если можно перенимать опыт лучших? Подключайтесь к успешным трейдерам, копируйте их стратегии и зарабатывайте на финансовых рынках — <b>подходит даже тем, у кого нет опыта в торговле</b>. Разумный трейдинг и быстрый рост!',
+  'welcome.howItWorks': 'Как это работает',
+  'welcome.step1.title': 'Скачайте приложение',
+  'welcome.step1.desc': 'Доступно для iOS и Android',
+  'welcome.step2.title': 'Быстрая регистрация',
+  'welcome.step2.desc': 'Используйте e-mail от вашего аккаунта Libertex',
+  'welcome.step3.title': 'Привяжите счёт MetaTrader',
+  'welcome.step3.desc':
+    'Скопируйте данные из раздела «Ещё» в приложении Libertex и вставьте их в раздел «Счёт» в приложении Copy&nbsp;Trading',
+  'welcome.step4.title': 'Выберите топ-трейдера',
+  'welcome.step4.desc':
+    'Изучите профили и выберите того, чья стратегия вам подходит',
+  'welcome.step5.title': 'Автоматическое копирование',
+  'welcome.step5.desc':
+    'Система повторяет сделки выбранного трейдера в реальном времени',
+  'welcome.bonus.title': 'Следите за результатом',
+  'welcome.bonus.desc':
+    'Отслеживайте доходность, меняйте настройки или ставьте на паузу в любой момент',
+  'welcome.cta': 'Начать сейчас',
+  'welcome.tag': 'Пусть опыт экспертов работает на вас!',
 };
 
 export const TRANSLATIONS: Record<Lang, Record<TranslationKey, string>> = { en, ru };

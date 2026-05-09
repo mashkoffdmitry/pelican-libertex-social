@@ -199,48 +199,110 @@ function applyInvest(range: { min: number; max: number } | null) {
 </template>
 
 <style scoped>
+/* ----- Filters sidebar (frosted glass card) ----- */
 .pelican-filters {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 16px;
-  border-right: 1px solid var(--line);
-  background: var(--card);
-  width: 260px;
-  flex: none;
+  gap: 16px;
+  padding: 18px 18px 12px;
+  background: rgba(24, 28, 34, .55);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+          backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 12px;
+  height: fit-content;
+  position: sticky;
+  top: 84px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, .35),
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    inset 0 -1px 0 rgba(0, 0, 0, .18);
+  /* Subtle frost-noise overlay */
+  position: sticky;
 }
+:global(.pelican-libsoc[data-theme="light"]) .pelican-filters {
+  background: rgba(255, 255, 255, .62);
+  border-color: rgba(0, 0, 0, .06);
+  box-shadow:
+    0 8px 32px rgba(20, 30, 20, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .85),
+    inset 0 -1px 0 rgba(0, 0, 0, .04);
+}
+.pelican-filters::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: .06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.7 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.pelican-filters > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ----- Section title row (label + reset button on the Risk section) ----- */
 .ftitle-row {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 .ftitle {
-  font-size: 13px;
+  display: block;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--muted);
 }
+
+/* ----- Reset filters: orange-bordered pill ----- */
 .btn-reset {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
   background: transparent;
-  border: none;
   color: var(--orange);
-  font: inherit;
-  font-size: 12px;
+  border: 1.5px solid var(--orange);
+  border-radius: 14px;
   cursor: pointer;
-  padding: 0;
+  letter-spacing: .2px;
+  text-transform: lowercase;
+  white-space: nowrap;
+  transition: background .15s, color .15s, transform .25s cubic-bezier(.2, .8, .2, 1);
 }
 .btn-reset:hover {
-  text-decoration: underline;
+  background: var(--orange);
+  color: #fff;
+  transform: scale(1.03);
+}
+:global(.pelican-libsoc[data-theme="dark"]) .btn-reset {
+  color: #ffb38a;
+  border-color: #ffb38a;
+}
+:global(.pelican-libsoc[data-theme="dark"]) .btn-reset:hover {
+  background: #ffb38a;
+  color: #1a1d22;
+}
+
+@media (max-width: 1340px) {
+  .pelican-filters {
+    position: static;
+    padding: 14px;
+    max-width: 760px;
+  }
 }
 
 @media (max-width: 720px) {
   .pelican-filters {
     display: none;
     width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+    padding: 14px;
   }
-  .pelican-filters.open {
-    display: flex;
-  }
+  .pelican-filters.open { display: flex; }
 }
 </style>

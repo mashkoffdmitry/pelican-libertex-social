@@ -59,32 +59,39 @@ function onChange(e: Event) {
 .pelican-fgroup {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 .title-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 8px;
 }
 .title {
-  font-size: 12px;
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
   color: var(--muted);
 }
 .val {
   font-size: 12px;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 6px;
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
-}
-input:focus {
+  font-size: 13px;
   outline: none;
-  border-color: var(--orange);
 }
+input:focus { border-color: var(--orange); }
 </style>

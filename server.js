@@ -6,40 +6,34 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.0';
+// The Vue bundle is now baked into the Docker image (see Dockerfile multi-stage
+// build). The proxy serves /style.css and /pelican-libertex-social.umd.cjs out
+// of /app/dist directly, so the landing page no longer depends on unpkg or the
+// public npm release of @mashkovd/pelican-vue. This decouples the deployed
+// branding from the npm package — friend's repo can ship custom styles, logo,
+// and welcome modal without polluting the public package.
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Libertex Social — Copy Trading</title>
-  <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
+  <title>Libertex Social — copy trading strategies</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
   <style>
-    * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
-    body { position:relative; overflow-x:hidden; }
-    body::before, body::after {
-      content:''; position:fixed; pointer-events:none; z-index:0;
-      background-repeat:no-repeat; background-position:center;
-      background-size:contain; filter:saturate(120%);
-    }
-    body::before {
-      background-image:url('/bg-blob.png');
-      width:920px; height:480px; top:-140px; right:-160px;
-      transform:rotate(-12deg); opacity:.42;
-    }
-    body::after {
-      background-image:url('/bg-blob2.png');
-      width:780px; height:580px; bottom:-180px; left:-140px;
-      transform:rotate(18deg); opacity:.30;
-    }
-    html[data-theme="light"] body::before { opacity:.18; }
-    html[data-theme="light"] body::after { opacity:.12; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    html, body, #app { min-height: 100vh; }
+    body { font-family: 'Mont','Manrope',Roboto,-apple-system,sans-serif; background: #0d1014; }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
+  <script src="/pelican-libertex-social.umd.cjs"></script>
   <script>
     const { createApp, h } = Vue;
     const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
@@ -778,14 +772,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- static blobs ----
-  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png') {
+  // ---- static brand assets (bg blobs, logo, favicon) ----
+  if (
+    u.pathname === '/bg-blob.png' ||
+    u.pathname === '/bg-blob2.png' ||
+    u.pathname === '/logo.png' ||
+    u.pathname === '/favicon.png'
+  ) {
     const file = path.join(__dirname, u.pathname.slice(1));
     if (fs.existsSync(file)) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
       return fs.createReadStream(file).pipe(res);
     }
     res.writeHead(404); return res.end('not found');
+  }
+
+  // ---- Vue bundle (CSS + UMD), built into /app/dist by the Dockerfile ----
+  // Short cache: bundles change on every Docker rebuild (i.e. every push to
+  // main). Browsers will revalidate via ETag once max-age expires.
+  if (u.pathname === '/style.css' || u.pathname === '/pelican-libertex-social.umd.cjs') {
+    const file = path.join(__dirname, 'dist', u.pathname.slice(1));
+    if (fs.existsSync(file)) {
+      const isCss = u.pathname.endsWith('.css');
+      const ctype = isCss ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8';
+      res.writeHead(200, {
+        'Content-Type': ctype,
+        'Cache-Control': 'public, max-age=300',
+        'Access-Control-Allow-Origin': '*',
+      });
+      return fs.createReadStream(file).pipe(res);
+    }
+    res.writeHead(404); return res.end('bundle not built');
   }
 
   // ---- root landing ----

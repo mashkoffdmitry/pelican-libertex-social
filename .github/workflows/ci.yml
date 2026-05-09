@@ -89,9 +89,14 @@ jobs:
   publish-vue:
     name: publish @mashkovd/pelican-vue to npm
     needs: [vue]
-    # Only publish on push to main AND only when NPM_TOKEN is configured.
-    # Skips silently on forks / contributors who haven't set the secret.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Disabled: the proxy now bakes the Vue bundle into its Docker image (see
+    # Dockerfile multi-stage build), so the public npm package no longer needs
+    # to be republished on every change. The pelican-vue source in this repo
+    # contains friend-specific branding (logo, welcome modal, RU translations)
+    # that should NOT propagate to npm consumers. Re-enable by changing the
+    # condition back to `github.event_name == 'push' && github.ref == 'refs/heads/main'`
+    # after stripping the deployment-specific assets.
+    if: false
     runs-on: ubuntu-latest
     defaults:
       run:

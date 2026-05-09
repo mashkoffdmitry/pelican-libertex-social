@@ -35,35 +35,31 @@ function toggle(level: RiskLevel) {
 <style scoped>
 .pelican-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .chip {
   cursor: pointer;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text);
-  font: inherit;
+  padding: 5px 10px;
+  background: var(--input-bg);
+  color: var(--text-2);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  font-family: inherit;
   font-size: 12px;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background .15s, border-color .15s, color .15s,
+    transform .25s cubic-bezier(.2, .8, .2, 1),
+    box-shadow .25s;
 }
 .chip:hover {
   border-color: var(--orange);
+  transform: translateY(-1px);
 }
-.chip.risk-low.on {
-  background: var(--chip-low-bg);
-  color: var(--chip-low-text);
-  border-color: var(--chip-low-bg);
-}
-.chip.risk-medium.on {
-  background: var(--chip-med-bg);
-  color: var(--chip-med-text);
-  border-color: var(--chip-med-bg);
-}
-.chip.risk-high.on {
-  background: var(--chip-high-bg);
-  color: var(--chip-high-text);
-  border-color: var(--chip-high-bg);
+.chip.on {
+  background: var(--orange);
+  color: #fff;
+  border-color: var(--orange);
+  box-shadow: 0 4px 14px rgba(239, 124, 70, .40);
 }
 </style>
