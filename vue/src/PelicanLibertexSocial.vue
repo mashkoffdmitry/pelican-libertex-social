@@ -22,6 +22,7 @@ import type { PelicanError } from './utils/http';
 import type { SortKey, SortColumn } from './constants/sort';
 import { PAGE_SIZE } from './constants/defaults';
 import { LOCALE_KEY, API_BASE_KEY, CATALOG_BASE_KEY } from './injection-keys';
+import TraderProfileView from './components/TraderProfileView.vue';
 import './styles/index.css';
 
 const props = withDefaults(
@@ -104,16 +105,19 @@ watch(pagination.pageItems, (items) => {
 const expanded = reactive(new Set<number>());
 const filtersOpen = ref(false);
 const investAmount = ref<number | null>(null);
+const selectedStrategy = ref<Strategy | null>(null);
 
 function toggleRow(id: number) {
-  if (expanded.has(id)) expanded.delete(id);
-  else expanded.add(id);
-
   const s = catalog.catalog.value.find((x) => x.Id === id);
-  if (s) {
-    if ((!s._meta || !s._stats) && !s._enrichAttempted) void catalog.enrichOne(id);
-    emit('select-strategy', s);
-  }
+  if (!s) return;
+  if ((!s._meta || !s._stats) && !s._enrichAttempted) void catalog.enrichOne(id);
+  emit('select-strategy', s);
+  // Open the Trader Profile instead of expanding in-place
+  selectedStrategy.value = s;
+}
+
+function closeProfile() {
+  selectedStrategy.value = null;
 }
 
 function toggleSort(col: SortColumn) {
@@ -149,70 +153,81 @@ onMounted(() => catalog.start());
 
 <template>
   <div class="pelican-libsoc" :data-theme="themeApi.resolved.value">
-    <header class="brand-row">
-      <slot name="brand">
-        <div class="default-brand">{{ t('app.brand') }}</div>
-      </slot>
-      <button class="lang-toggle" type="button" :title="i18n.lang.value" @click="i18n.cycleLang">
-        {{ i18n.lang.value.toUpperCase() }}
-      </button>
-      <button class="theme-toggle" type="button" :title="themeApi.mode.value" @click="themeApi.cycle">
-        <span aria-hidden="true">{{ themeApi.resolved.value === 'dark' ? '🌙' : '☀️' }}</span>
-      </button>
-    </header>
-
-    <Toolbar
-      :search="filtersApi.filters.search"
-      :sort-key="sortApi.sortKey.value"
-      :total="catalog.total.value"
-      :filtered-total="filtersApi.filtered.value.length"
-      :page="pagination.page.value"
-      :total-pages="pagination.totalPages.value"
-      @update:search="(v) => patchFilters({ search: v })"
-      @update:sort-key="(k) => sortApi.setKey(k)"
-      @refresh="catalog.refresh"
-      @toggle-filters="filtersOpen = !filtersOpen"
+    <!-- ── Trader Profile view ─────────────────────────────── -->
+    <TraderProfileView
+      v-if="selectedStrategy"
+      :strategy="selectedStrategy"
+      @back="closeProfile"
+      @subscribe="() => {}"
     />
 
-    <ProgressBar
-      :loaded="catalog.loaded.value"
-      :total="catalog.total.value"
-      :active="catalog.building.value && !catalog.ready.value"
-    />
+    <!-- ── Catalog view (default) ─────────────────────────── -->
+    <template v-else>
+      <header class="brand-row">
+        <slot name="brand">
+          <div class="default-brand">{{ t('app.brand') }}</div>
+        </slot>
+        <button class="lang-toggle" type="button" :title="i18n.lang.value" @click="i18n.cycleLang">
+          {{ i18n.lang.value.toUpperCase() }}
+        </button>
+        <button class="theme-toggle" type="button" :title="themeApi.mode.value" @click="themeApi.cycle">
+          <span aria-hidden="true">{{ themeApi.resolved.value === 'dark' ? '🌙' : '☀️' }}</span>
+        </button>
+      </header>
 
-    <main class="pelican-main">
-      <FiltersPanel
-        :filters="filtersApi.filters"
-        :invest-amount="investAmount"
-        :open="filtersOpen"
-        @update:filters="patchFilters"
-        @update:invest-amount="(v) => (investAmount = v)"
-        @reset="resetFilters"
-      />
-
-      <StrategyTable
-        :page-items="pagination.pageItems.value"
-        :expanded="expanded"
+      <Toolbar
+        :search="filtersApi.filters.search"
         :sort-key="sortApi.sortKey.value"
+        :total="catalog.total.value"
+        :filtered-total="filtersApi.filtered.value.length"
         :page="pagination.page.value"
         :total-pages="pagination.totalPages.value"
-        :page-range="pagination.pageRange.value"
-        :open-signals="signals.open.value"
-        :closed-signals="signals.closed.value"
-        @toggle-row="toggleRow"
-        @toggle-sort="toggleSort"
-        @load-trades="loadTrades"
-        @select="(s) => emit('select-strategy', s)"
-        @go="onPageGo"
-      >
-        <template #empty>
-          <slot name="empty">{{ t('table.empty') }}</slot>
-        </template>
-        <template #row-actions="slotProps">
-          <slot name="row-actions" v-bind="slotProps" />
-        </template>
-      </StrategyTable>
-    </main>
+        @update:search="(v) => patchFilters({ search: v })"
+        @update:sort-key="(k) => sortApi.setKey(k)"
+        @refresh="catalog.refresh"
+        @toggle-filters="filtersOpen = !filtersOpen"
+      />
+
+      <ProgressBar
+        :loaded="catalog.loaded.value"
+        :total="catalog.total.value"
+        :active="catalog.building.value && !catalog.ready.value"
+      />
+
+      <main class="pelican-main">
+        <FiltersPanel
+          :filters="filtersApi.filters"
+          :invest-amount="investAmount"
+          :open="filtersOpen"
+          @update:filters="patchFilters"
+          @update:invest-amount="(v) => (investAmount = v)"
+          @reset="resetFilters"
+        />
+
+        <StrategyTable
+          :page-items="pagination.pageItems.value"
+          :expanded="expanded"
+          :sort-key="sortApi.sortKey.value"
+          :page="pagination.page.value"
+          :total-pages="pagination.totalPages.value"
+          :page-range="pagination.pageRange.value"
+          :open-signals="signals.open.value"
+          :closed-signals="signals.closed.value"
+          @toggle-row="toggleRow"
+          @toggle-sort="toggleSort"
+          @load-trades="loadTrades"
+          @select="(s) => emit('select-strategy', s)"
+          @go="onPageGo"
+        >
+          <template #empty>
+            <slot name="empty">{{ t('table.empty') }}</slot>
+          </template>
+          <template #row-actions="slotProps">
+            <slot name="row-actions" v-bind="slotProps" />
+          </template>
+        </StrategyTable>
+      </main>
+    </template>
   </div>
 </template>
 

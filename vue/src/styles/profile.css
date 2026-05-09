@@ -1,0 +1,802 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
+/* ----------------------------------------------------------------
+   Design tokens — scoped to .pelican-profile to avoid collisions
+   with the existing catalog's --bg, --text, --orange, etc.
+   ---------------------------------------------------------------- */
+
+.pelican-profile {
+  /* Light theme */
+  --pl-bg:       oklch(0.982 0.005 80);
+  --pl-surface:  oklch(1.000 0.000 0);
+  --pl-surface-2:oklch(0.962 0.005 80);
+  --pl-surface-3:oklch(0.945 0.006 80);
+  --pl-border:   oklch(0.910 0.005 80);
+  --pl-border-2: oklch(0.870 0.006 80);
+  --pl-fg:       oklch(0.180 0.010 80);
+  --pl-fg-2:     oklch(0.420 0.008 80);
+  --pl-fg-3:     oklch(0.620 0.005 80);
+  --pl-fg-4:     oklch(0.780 0.004 80);
+  --pl-up:       oklch(0.580 0.110 150);
+  --pl-down:     oklch(0.560 0.140 25);
+  --pl-accent:   oklch(0.74 0.13 75);     /* Amber — warm, matches brand orange */
+  --pl-accent-fg:oklch(0.18 0.02 75);
+}
+
+/* Dark overrides — parent data-theme="dark" lives on .pelican-libsoc */
+.pelican-libsoc[data-theme="dark"] .pelican-profile {
+  --pl-bg:       oklch(0.140 0.005 80);
+  --pl-surface:  oklch(0.170 0.005 80);
+  --pl-surface-2:oklch(0.205 0.005 80);
+  --pl-surface-3:oklch(0.230 0.005 80);
+  --pl-border:   oklch(0.245 0.005 80);
+  --pl-border-2: oklch(0.300 0.006 80);
+  --pl-fg:       oklch(0.965 0.005 80);
+  --pl-fg-2:     oklch(0.745 0.005 80);
+  --pl-fg-3:     oklch(0.555 0.005 80);
+  --pl-fg-4:     oklch(0.380 0.005 80);
+  --pl-up:       oklch(0.720 0.140 150);
+  --pl-down:     oklch(0.700 0.150 25);
+  /* Amber accent stays the same in dark */
+}
+
+/* ----------------------------------------------------------------
+   Reset & base
+   ---------------------------------------------------------------- */
+.pelican-profile,
+.pelican-profile *,
+.pelican-profile *::before,
+.pelican-profile *::after {
+  box-sizing: border-box;
+}
+
+.pelican-profile {
+  font-family: 'Geist', 'Geist Variable', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--pl-bg);
+  color: var(--pl-fg);
+  min-height: 100%;
+  padding: 24px 28px 48px;
+  position: relative;
+}
+
+/* ----------------------------------------------------------------
+   Primitives
+   ---------------------------------------------------------------- */
+
+.pl-card {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--pl-border);
+  background: transparent;
+  color: var(--pl-fg);
+  font: 500 13px 'Geist', system-ui;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.pl-btn:hover { opacity: 0.75; }
+
+.pl-btn.primary {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 10px;
+  background: var(--pl-accent);
+  color: var(--pl-accent-fg);
+  border-color: var(--pl-accent);
+  font-size: 14px;
+}
+.pl-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--pl-fg-2);
+}
+.pl-btn.sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.pl-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: 500 11px 'Geist', system-ui;
+  border: 1px solid var(--pl-border);
+  color: var(--pl-fg-2);
+  background: var(--pl-surface-2);
+}
+.pl-tag.ok {
+  color: var(--pl-up);
+  background: color-mix(in oklch, var(--pl-up) 12%, var(--pl-surface));
+  border-color: color-mix(in oklch, var(--pl-up) 24%, var(--pl-border));
+}
+.pl-tag.warn {
+  color: var(--pl-down);
+  background: color-mix(in oklch, var(--pl-down) 12%, var(--pl-surface));
+  border-color: color-mix(in oklch, var(--pl-down) 24%, var(--pl-border));
+}
+
+.pl-eyebrow {
+  font: 500 10px 'Geist', system-ui;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--pl-fg-3);
+}
+
+.pl-mono {
+  font-family: 'Geist Mono', 'Geist Mono Variable', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.008em;
+}
+
+.pl-serif {
+  font-family: 'Newsreader', 'Georgia', serif;
+}
+
+/* ----------------------------------------------------------------
+   Back bar
+   ---------------------------------------------------------------- */
+.pl-back-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--pl-fg-3);
+}
+.pl-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: 500 12px 'Geist', system-ui;
+  color: var(--pl-fg-2);
+  padding: 0;
+}
+.pl-back-btn:hover { color: var(--pl-fg); }
+.pl-breadcrumb-sep {
+  opacity: 0.35;
+}
+
+/* ----------------------------------------------------------------
+   Header
+   ---------------------------------------------------------------- */
+.pl-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.pl-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 28px 'Geist', system-ui;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--pl-border);
+  background: color-mix(in oklch, var(--pl-fg) 10%, var(--pl-surface));
+  color: var(--pl-fg-2);
+}
+.pl-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pl-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pl-header-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pl-header-name {
+  font-family: 'Newsreader', serif;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.pl-header-sub {
+  font-size: 13px;
+  color: var(--pl-fg-2);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.pl-meta-sep {
+  opacity: 0.35;
+}
+
+.pl-header-strategy {
+  font-size: 13px;
+  color: var(--pl-fg-2);
+  max-width: 640px;
+}
+
+.pl-header-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 200px;
+}
+
+.pl-cta-secondary {
+  display: flex;
+  gap: 8px;
+}
+.pl-cta-secondary .pl-btn {
+  flex: 1;
+}
+
+/* ----------------------------------------------------------------
+   Stats strip
+   ---------------------------------------------------------------- */
+.pl-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 16px;
+}
+
+.pl-stat-tile {
+  padding: 14px 16px;
+  border-right: 1px solid var(--pl-border);
+}
+.pl-stat-tile:last-child {
+  border-right: none;
+}
+
+.pl-stat-value {
+  font-family: 'Geist Mono', monospace;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  margin: 4px 0 2px;
+}
+.pl-stat-sub {
+  font-size: 11px;
+  color: var(--pl-fg-2);
+}
+.pl-stat-up   { color: var(--pl-up); }
+.pl-stat-down { color: var(--pl-down); }
+
+/* ----------------------------------------------------------------
+   Equity curve card
+   ---------------------------------------------------------------- */
+.pl-equity-card {
+  margin-bottom: 16px;
+  padding: 18px 22px;
+}
+
+.pl-equity-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pl-equity-headline {
+  font-family: 'Newsreader', serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 0;
+}
+
+.pl-equity-headline-up {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--pl-up);
+  margin-left: 8px;
+  font-family: 'Geist Mono', monospace;
+}
+
+/* Segmented control */
+.pl-seg {
+  display: inline-flex;
+  border: 1px solid var(--pl-border);
+  border-radius: 8px;
+  background: var(--pl-surface-2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.pl-seg-btn {
+  padding: 5px 10px;
+  font: 500 11px 'Geist', system-ui;
+  color: var(--pl-fg-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.pl-seg-btn:hover { color: var(--pl-fg); }
+.pl-seg-btn.active {
+  background: var(--pl-surface);
+  color: var(--pl-fg);
+  border-radius: 6px;
+  margin: 2px;
+  box-shadow: 0 1px 3px color-mix(in oklch, var(--pl-fg) 10%, transparent);
+}
+
+/* ----------------------------------------------------------------
+   Two-column section
+   ---------------------------------------------------------------- */
+.pl-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ----------------------------------------------------------------
+   Portfolio composition
+   ---------------------------------------------------------------- */
+.pl-composition-card {
+  padding: 18px;
+}
+
+.pl-composition-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pl-composition-title {
+  font-family: 'Newsreader', serif;
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.pl-composition-updated {
+  font-size: 11px;
+  color: var(--pl-fg-2);
+}
+
+/* Stacked bar */
+.pl-market-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pl-border);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.pl-market-bar-seg {
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+/* Position list */
+.pl-position-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pl-position-row {
+  display: grid;
+  grid-template-columns: 12px 72px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--pl-border);
+  font-size: 12px;
+}
+.pl-position-row:last-child { border-bottom: none; }
+
+.pl-pos-chip {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.pl-pos-sym {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+.pl-pos-weight {
+  font-family: 'Geist Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* ----------------------------------------------------------------
+   Recent trades card
+   ---------------------------------------------------------------- */
+.pl-trades-card {
+  padding: 18px;
+}
+
+.pl-trades-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pl-trades-title {
+  font-family: 'Newsreader', serif;
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.pl-trades-link {
+  font-size: 12px;
+  color: var(--pl-fg-2);
+  cursor: default;
+}
+
+.pl-table-head {
+  display: grid;
+  grid-template-columns: 1fr 0.55fr 0.75fr 0.75fr 0.75fr 0.6fr 0.9fr;
+  gap: 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--pl-border);
+  font: 500 11px 'Geist', system-ui;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-fg-3);
+}
+
+.pl-table-row {
+  display: grid;
+  grid-template-columns: 1fr 0.55fr 0.75fr 0.75fr 0.75fr 0.6fr 0.9fr;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--pl-border);
+  font-size: 12px;
+}
+.pl-table-row:last-child { border-bottom: none; }
+
+.pl-trade-sym {
+  font-family: 'Geist Mono', monospace;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.pl-trade-side-buy  { color: var(--pl-up); }
+.pl-trade-side-sell { color: var(--pl-down); }
+
+.pl-trade-pnl-pos { color: var(--pl-up); }
+.pl-trade-pnl-neg { color: var(--pl-down); }
+
+.pl-trade-price {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+}
+
+.pl-trade-time {
+  font-size: 11px;
+  color: var(--pl-fg-3);
+}
+
+/* ----------------------------------------------------------------
+   Footer
+   ---------------------------------------------------------------- */
+.pl-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0 8px;
+  border-top: 1px solid var(--pl-border);
+}
+
+.pl-footer-note {
+  font-size: 12px;
+  color: var(--pl-fg-3);
+  max-width: 720px;
+  line-height: 1.55;
+}
+
+.pl-footer-tags {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------------
+   Subscribe sheet
+   ---------------------------------------------------------------- */
+.pl-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklch, var(--pl-fg) 40%, transparent);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+}
+
+@media (min-width: 600px) {
+  .pl-sheet-backdrop {
+    align-items: center;
+  }
+}
+
+.pl-sheet {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px 16px 0 0;
+  padding: 20px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 600px) {
+  .pl-sheet {
+    border-radius: 16px;
+    margin: 20px;
+  }
+}
+
+.pl-sheet-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pl-border-2);
+  margin: 0 auto -8px;
+}
+
+.pl-sheet-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pl-sheet-title {
+  font-family: 'Newsreader', serif;
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.pl-sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pl-sheet-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pl-preset-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pl-preset-row .pl-btn {
+  flex: 1;
+  min-width: 60px;
+  font-size: 12px;
+  height: 32px;
+}
+
+.pl-amount-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--pl-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--pl-surface-2);
+}
+.pl-amount-prefix {
+  font-family: 'Geist Mono', monospace;
+  color: var(--pl-fg-2);
+}
+.pl-amount-input {
+  border: none;
+  background: transparent;
+  font: 500 18px 'Geist Mono', monospace;
+  color: var(--pl-fg);
+  width: 100%;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--pl-surface-3);
+  outline: none;
+  cursor: pointer;
+}
+.pl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--pl-accent);
+  cursor: pointer;
+  border: 2px solid var(--pl-accent-fg);
+}
+
+.pl-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--pl-fg-3);
+}
+
+.pl-stop-seg {
+  display: flex;
+  border: 1px solid var(--pl-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--pl-surface-2);
+}
+.pl-stop-seg .pl-seg-btn {
+  flex: 1;
+  font-size: 12px;
+}
+
+.pl-summary-card {
+  border: 1px solid var(--pl-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.pl-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--pl-border);
+}
+.pl-summary-row:last-child { border-bottom: none; }
+
+.pl-sheet-footer {
+  display: flex;
+  gap: 10px;
+}
+
+/* ----------------------------------------------------------------
+   Mobile responsive
+   ---------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .pelican-profile {
+    padding: 16px 18px 100px; /* bottom clearance for sticky CTA */
+  }
+
+  .pl-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .pl-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 20px;
+    margin: 0 auto;
+  }
+
+  .pl-header-name {
+    font-size: 22px;
+  }
+
+  .pl-header-name-row {
+    justify-content: center;
+  }
+
+  .pl-header-sub {
+    justify-content: center;
+  }
+
+  .pl-header-cta {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pl-header-cta.desktop-only {
+    display: none;
+  }
+
+  .pl-stats-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* On mobile show only 3 key tiles; extra tiles get hidden */
+  .pl-stat-tile.mobile-hide {
+    display: none;
+  }
+
+  .pl-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .pl-table-head,
+  .pl-table-row {
+    grid-template-columns: 1fr auto auto auto;
+  }
+  .pl-table-col-size,
+  .pl-table-col-entry,
+  .pl-table-col-exit {
+    display: none;
+  }
+
+  /* Sticky CTA */
+  .pl-mobile-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 18px 22px;
+    background: color-mix(in oklch, var(--pl-bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--pl-border);
+    z-index: 10;
+  }
+}
+
+@media (min-width: 721px) {
+  .pl-mobile-cta {
+    display: none;
+  }
+}
