@@ -1,6 +1,6 @@
 {
   "name": "@mashkovd/pelican-vue",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "license": "MIT",
   "description": "Vue 3 component for browsing Libertex Social copy-trading strategies via a pelican-libertex-social proxy.",
