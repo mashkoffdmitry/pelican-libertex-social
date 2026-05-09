@@ -6,7 +6,7 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.0';
+const PKG_VERSION = '0.4.0-preview.33';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
