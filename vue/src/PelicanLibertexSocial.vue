@@ -111,6 +111,12 @@ function toggleRow(id: number) {
   if (!s) return;
   if ((!s._meta || !s._stats) && !s._enrichAttempted) void catalog.enrichOne(id);
   emit('select-strategy', s);
+  if (expanded.has(id)) {
+    expanded.delete(id);
+  } else {
+    expanded.clear();
+    expanded.add(id);
+  }
 }
 
 function toggleSort(col: SortColumn) {

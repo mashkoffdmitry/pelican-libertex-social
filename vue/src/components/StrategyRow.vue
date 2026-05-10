@@ -99,7 +99,7 @@ function toggleClosed() {
         <div class="by">{{ profileName }}</div>
       </div>
     </div>
-    <div class="c-spark" :data-label="t('row.dataLabel.equityCurve')">
+    <div class="c-spark" :class="{ 'no-hist': !s.History?.length }" :data-label="t('row.dataLabel.equityCurve')">
       <Sparkline :history="s.History" />
     </div>
     <div class="c-num" :data-label="t('row.dataLabel.return')">
@@ -124,6 +124,7 @@ function toggleClosed() {
   </div>
 
   <div v-if="expanded" class="pelican-row-expanded" @click.stop>
+    <button class="close-btn" type="button" aria-label="Close" @click="emit('toggle')">✕</button>
     <div class="grid">
       <div class="col-stats">
         <div class="field"><div class="label">{{ t('expanded.currency') }}</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
@@ -259,12 +260,36 @@ function toggleClosed() {
 }
 
 .pelican-row-expanded {
+  position: relative;
   padding: 16px;
+  padding-top: 44px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: var(--fg-3);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.close-btn:hover {
+  border-color: var(--border-2);
+  color: var(--fg);
 }
 .grid {
   display: grid;
@@ -319,6 +344,9 @@ function toggleClosed() {
     color: var(--fg-3);
     margin-right: 8px;
     font-size: 11px;
+  }
+  .no-hist {
+    display: none;
   }
   .grid {
     grid-template-columns: 1fr;

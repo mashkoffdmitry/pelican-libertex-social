@@ -35,6 +35,29 @@ const display = computed(() => {
   return props.format ? props.format(props.modelValue) : String(props.modelValue);
 });
 
+const trackStyle = computed(() => {
+  if (props.modelValue == null) {
+    return { background: 'var(--surface-3, #EEF0F2)' };
+  }
+  const pct = Math.max(0, Math.min(100, ((raw.value - props.min) / (props.max - props.min)) * 100));
+  if (inverted.value) {
+    return {
+      background: `linear-gradient(to right,
+        var(--surface-3, #EEF0F2) 0%,
+        var(--surface-3, #EEF0F2) ${pct}%,
+        var(--accent, #F25A24) ${pct}%,
+        var(--accent, #F25A24) 100%)`,
+    };
+  }
+  return {
+    background: `linear-gradient(to right,
+      var(--accent, #F25A24) 0%,
+      var(--accent, #F25A24) ${pct}%,
+      var(--surface-3, #EEF0F2) ${pct}%,
+      var(--surface-3, #EEF0F2) 100%)`,
+  };
+});
+
 function onInput(e: Event) {
   const v = parseInt((e.target as HTMLInputElement).value, 10);
   if (isNaN(v)) return;
@@ -52,16 +75,18 @@ function onInput(e: Event) {
       <label class="title">{{ label }}</label>
       <span class="val">{{ display }}</span>
     </div>
-    <input
-      type="range"
-      class="range"
-      :min="min"
-      :max="max"
-      :step="step"
-      :value="raw"
-      @input="onInput"
-      @change="onInput"
-    />
+    <div class="single-track" :style="trackStyle">
+      <input
+        type="range"
+        class="range"
+        :min="min"
+        :max="max"
+        :step="step"
+        :value="raw"
+        @input="onInput"
+        @change="onInput"
+      />
+    </div>
   </div>
 </template>
 
@@ -84,7 +109,23 @@ function onInput(e: Event) {
   font-size: 12px;
   color: var(--fg);
 }
-.range {
-  width: 100%;
+.single-track {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  background-size: 100% 4px;
+  background-repeat: no-repeat;
+  background-position: center;
 }
+.single-track .range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: transparent;
+}
+.range::-webkit-slider-runnable-track { background: transparent; }
+.range::-moz-range-track             { background: transparent; }
+.range::-moz-range-progress          { background: transparent; }
 </style>
