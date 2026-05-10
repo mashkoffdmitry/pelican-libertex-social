@@ -235,6 +235,27 @@ function loadCatalogFromDisk() {
   } catch { return null; }
 }
 
+// On cold start, seed fullCache from R2 if CATALOG_INGEST_URL is configured.
+// Returns true if the catalog was successfully seeded.
+async function seedFromR2() {
+  const ingestUrl = process.env.CATALOG_INGEST_URL;
+  if (!ingestUrl) return false;
+  try {
+    const base = new URL(ingestUrl).origin;
+    const r = await fetch(`${base}/api/strategies-full`, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) { console.log(`[r2] seed skipped: HTTP ${r.status}`); return false; }
+    const j = await r.json();
+    if (!Array.isArray(j.items) || j.items.length === 0) { console.log('[r2] seed skipped: empty catalog in R2'); return false; }
+    const ageH = ((Date.now() - (j.at || 0)) / 3600000).toFixed(1);
+    fullCache = { at: j.at || Date.now(), items: j.items, partial: null, building: null, progress: { loaded: j.items.length, total: j.items.length } };
+    console.log(`[r2] seeded ${j.items.length} items from R2 (age ${ageH}h)`);
+    return true;
+  } catch (e) {
+    console.log('[r2] seed failed:', e.message);
+    return false;
+  }
+}
+
 function compactStrategy(meta, stats, base) {
   const inc = stats?.Profitability?.Inception || {};
   const tr  = stats?.Trades?.Inception || {};
@@ -810,34 +831,45 @@ server.listen(PORT, () => {
 
   startScheduler();
 
-  const env = readEnv();
-  if (env.ACCESS_TOKEN) {
-    const left = parseInt(env.EXPIRES_AT || '0', 10) - Math.floor(Date.now() / 1000);
-    console.log(`token loaded (${left}s left)`);
-    if (!disk) {
-      // No persisted catalog — kick off initial build
-      setTimeout(() => {
-        console.log('[startup] no disk cache — building catalog now…');
-        getFull(env.ACCESS_TOKEN).then(items => {
-          console.log(`[startup] full catalog ready: ${items.length} items`);
-        }).catch(e => console.error('[startup] full build failed:', e.message));
-      }, 1000);
-    }
-  } else {
-    console.log('[startup] no token yet — will retry initial build once refresher saves one');
-    const t0 = Date.now();
-    const poll = setInterval(() => {
-      const e = readEnv();
-      if (e.ACCESS_TOKEN) {
-        clearInterval(poll);
-        console.log('[startup] token now available — building catalog…');
-        getFull(e.ACCESS_TOKEN).then(items => {
-          console.log(`[startup] full catalog ready: ${items.length} items`);
-        }).catch(err => console.error('[startup] full build failed:', err.message));
-      } else if (Date.now() - t0 > 5 * 60_000) {
-        clearInterval(poll);
-        console.error('[startup] no token after 5min — giving up');
+  (async () => {
+    // On cold start: prefer R2 over a full rebuild.
+    // Priority: disk cache → R2 seed → full rebuild.
+    let hasCache = !!disk;
+    if (!hasCache) hasCache = await seedFromR2();
+
+    const env = readEnv();
+    if (env.ACCESS_TOKEN) {
+      const left = parseInt(env.EXPIRES_AT || '0', 10) - Math.floor(Date.now() / 1000);
+      console.log(`token loaded (${left}s left)`);
+      if (!hasCache) {
+        // No disk cache and R2 is empty — kick off initial build
+        setTimeout(() => {
+          console.log('[startup] no cache — building catalog now…');
+          getFull(env.ACCESS_TOKEN).then(items => {
+            console.log(`[startup] full catalog ready: ${items.length} items`);
+          }).catch(e => console.error('[startup] full build failed:', e.message));
+        }, 1000);
       }
-    }, 10_000);
-  }
+    } else {
+      console.log('[startup] no token yet — will retry initial build once refresher saves one');
+      const t0 = Date.now();
+      const poll = setInterval(() => {
+        const e = readEnv();
+        if (e.ACCESS_TOKEN) {
+          clearInterval(poll);
+          if (hasCache) {
+            console.log('[startup] token available — catalog already seeded from R2, skipping rebuild');
+          } else {
+            console.log('[startup] token now available — building catalog…');
+            getFull(e.ACCESS_TOKEN).then(items => {
+              console.log(`[startup] full catalog ready: ${items.length} items`);
+            }).catch(err => console.error('[startup] full build failed:', err.message));
+          }
+        } else if (Date.now() - t0 > 5 * 60_000) {
+          clearInterval(poll);
+          console.error('[startup] no token after 5min — giving up');
+        }
+      }, 10_000);
+    }
+  })().catch(e => console.error('[startup] init error:', e.message));
 });
