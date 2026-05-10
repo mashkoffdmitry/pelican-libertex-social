@@ -256,11 +256,30 @@ async function seedFromR2() {
   }
 }
 
+// Trim history to ~60 points (matches the Vue widget's Sparkline density)
+// + drop sub-second timestamp precision and round AccountReturn to 4 decimals.
+// Same payload as widget produces locally, just baked into the catalog so the
+// sparkline shows up on first paint instead of after a per-row enrichment.
+function compactHistory(hist) {
+  if (!Array.isArray(hist) || hist.length === 0) return [];
+  const stride = hist.length > 60 ? Math.ceil(hist.length / 60) : 1;
+  const out = [];
+  for (let i = 0; i < hist.length; i++) {
+    if (i % stride !== 0 && i !== hist.length - 1) continue;
+    const p = hist[i];
+    const ts = typeof p.Timestamp === 'string' ? p.Timestamp.slice(0, 10) : p.Timestamp;
+    const r = typeof p.AccountReturn === 'number' ? Math.round(p.AccountReturn * 1e4) / 1e4 : p.AccountReturn;
+    out.push({ Timestamp: ts, AccountReturn: r });
+  }
+  return out;
+}
+
 function compactStrategy(meta, stats, base) {
   const inc = stats?.Profitability?.Inception || {};
   const tr  = stats?.Trades?.Inception || {};
   // Fallback chain: today's fresh fetch → previous catalog value → null. So a transient
   // upstream blip during the daily rebuild keeps yesterday's data instead of nuking the row.
+  const history = stats ? compactHistory(inc.History) : (Array.isArray(base.History) ? base.History : []);
   return {
     Id: base.Id,
     Name: meta?.Name ?? base.Name ?? null,
@@ -277,6 +296,7 @@ function compactStrategy(meta, stats, base) {
     MaxDD: inc.MaxDrawdown != null ? inc.MaxDrawdown * 100 : (base.MaxDD ?? null),
     RealisedPnl: inc.RealisedPnl ?? base.RealisedPnl ?? null,
     UnrealisedPnl: inc.UnrealisedPnl ?? base.UnrealisedPnl ?? null,
+    History: history,
     TradesTotal: tr.Total ?? base.TradesTotal ?? 0,
     Wins: tr.Wins ?? base.Wins ?? 0,
     Losses: tr.Losses ?? base.Losses ?? 0,
