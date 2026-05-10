@@ -22,7 +22,6 @@ import type { PelicanError } from './utils/http';
 import type { SortKey, SortColumn } from './constants/sort';
 import { PAGE_SIZE } from './constants/defaults';
 import { LOCALE_KEY, API_BASE_KEY, CATALOG_BASE_KEY } from './injection-keys';
-import TraderProfileView from './components/TraderProfileView.vue';
 import ThemeToggle from './components/ThemeToggle.vue';
 import './styles/index.css';
 
@@ -106,19 +105,12 @@ watch(pagination.pageItems, (items) => {
 const expanded = reactive(new Set<number>());
 const filtersOpen = ref(false);
 const investAmount = ref<number | null>(null);
-const selectedStrategy = ref<Strategy | null>(null);
 
 function toggleRow(id: number) {
   const s = catalog.catalog.value.find((x) => x.Id === id);
   if (!s) return;
   if ((!s._meta || !s._stats) && !s._enrichAttempted) void catalog.enrichOne(id);
   emit('select-strategy', s);
-  // Open the Trader Profile instead of expanding in-place
-  selectedStrategy.value = s;
-}
-
-function closeProfile() {
-  selectedStrategy.value = null;
 }
 
 function toggleSort(col: SortColumn) {
@@ -154,17 +146,7 @@ onMounted(() => catalog.start());
 
 <template>
   <div class="pelican-libsoc" :class="`theme-${themeApi.resolved.value}`">
-    <!-- ── Trader Profile view ─────────────────────────────── -->
-    <TraderProfileView
-      v-if="selectedStrategy"
-      :strategy="selectedStrategy"
-      @back="closeProfile"
-      @subscribe="() => {}"
-    />
-
-    <!-- ── Catalog view (default) ─────────────────────────── -->
-    <template v-else>
-      <header class="brand-row">
+    <header class="brand-row">
         <slot name="brand">
           <div class="default-brand">{{ t('app.brand') }}</div>
         </slot>
@@ -229,7 +211,6 @@ onMounted(() => catalog.start());
           </template>
         </StrategyTable>
       </main>
-    </template>
   </div>
 </template>
 
