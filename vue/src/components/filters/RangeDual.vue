@@ -61,15 +61,25 @@ const trackStyle = computed(() => ({
 }));
 
 function onMin(e: Event) {
-  let v = parseInt((e.target as HTMLInputElement).value, 10);
+  const target = e.target as HTMLInputElement;
+  let v = parseInt(target.value, 10);
   if (isNaN(v)) return;
   if (v >= hi.value) v = hi.value - 1;
+  if (v < rawMin.value) v = rawMin.value;
+  // Force the DOM input value back to the clamped value *during* the active
+  // drag. Browsers ignore programmatic value updates on a range input that is
+  // currently being dragged — relying on Vue's :value rebind alone leaves the
+  // thumb visually past the other handle until the user releases.
+  target.value = String(v);
   emit('update:modelValueMin', v <= rawMin.value ? null : v);
 }
 function onMax(e: Event) {
-  let v = parseInt((e.target as HTMLInputElement).value, 10);
+  const target = e.target as HTMLInputElement;
+  let v = parseInt(target.value, 10);
   if (isNaN(v)) return;
   if (v <= lo.value) v = lo.value + 1;
+  if (v > rawMax.value) v = rawMax.value;
+  target.value = String(v);
   emit('update:modelValueMax', v >= rawMax.value ? null : v);
 }
 </script>
