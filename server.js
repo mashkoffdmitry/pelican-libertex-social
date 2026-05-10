@@ -361,19 +361,25 @@ async function buildFull(token) {
   }
   fullCache.partial = out;
 
-  let metaErr = 0;
+  let metaErr = 0, statsSkipped = 0;
   async function worker() {
     while (true) {
       const idx = cursor++;
       if (idx >= baseWithPrev.length) return;
       const b = baseWithPrev[idx];
+      // Skip the /stats fetch for strategies known-disabled in the previous catalog —
+      // they account for ~80% of the catalog and are filtered out at serve time
+      // (`onlyEnabled`). We still fetch /meta so we can detect a flip back to enabled,
+      // and a second pass below catches those cases. Roughly halves rebuild time.
+      const knownDisabled = prevById.get(b.Id)?.IsEnabled === false;
       const [metaR, statsR] = await Promise.allSettled([
         upstreamGetRetry('/api/strategies/' + b.Id, token),
-        upstreamGetRetry('/api/strategies/' + b.Id + '/stats', token),
+        knownDisabled ? Promise.resolve(null) : upstreamGetRetry('/api/strategies/' + b.Id + '/stats', token),
       ]);
       let meta  = metaR.status  === 'fulfilled' ? metaR.value  : (metaErr++, null);
       let stats = statsR.status === 'fulfilled' ? statsR.value : (statsErr++, null);
-      if (stats === null) statsNull++;
+      if (knownDisabled) statsSkipped++;
+      else if (stats === null) statsNull++;
       // fall back to discover meta when /api/strategies/{id} returned 404 (private signal)
       if (!meta) meta = discoverMeta.get(b.Id) || null;
       out[idx] = compactStrategy(meta, stats, b);
@@ -382,7 +388,35 @@ async function buildFull(token) {
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
-  console.log(`[full] fetched=${fetched} stats-null=${statsNull} stats-err=${statsErr} meta-err=${metaErr}`);
+  console.log(`[full] fetched=${fetched} stats-skipped=${statsSkipped} stats-null=${statsNull} stats-err=${statsErr} meta-err=${metaErr}`);
+
+  // Second pass: items that we skipped stats for, but whose fresh meta says
+  // they're now IsEnabled=true (someone flipped them back on). Fetch their
+  // stats so the catalog has fresh numbers + History instead of stale prev values.
+  const newlyEnabled = [];
+  for (let i = 0; i < out.length; i++) {
+    const wasDisabled = prevById.get(baseWithPrev[i].Id)?.IsEnabled === false;
+    if (wasDisabled && out[i].IsEnabled === true && !out[i]._stats) newlyEnabled.push(i);
+  }
+  if (newlyEnabled.length) {
+    console.log(`[full] second pass: ${newlyEnabled.length} newly-enabled strategies`);
+    let cur1 = 0, recovered = 0;
+    async function newlyEnabledWorker() {
+      while (true) {
+        const j = cur1++;
+        if (j >= newlyEnabled.length) return;
+        const idx = newlyEnabled[j];
+        const b = baseWithPrev[idx];
+        const statsR = await upstreamGetRetry('/api/strategies/' + b.Id + '/stats', token).catch(() => null);
+        if (statsR) {
+          out[idx] = compactStrategy(out[idx], statsR, b);
+          recovered++;
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, newlyEnabledWorker));
+    console.log(`[full] second pass: ${recovered}/${newlyEnabled.length} now have stats`);
+  }
 
   // Final retry pass: anything that ended without meta AND without prior data → try once more
   // with longer cool-down. This catches the "first build for new strategy + transient blip" case.
