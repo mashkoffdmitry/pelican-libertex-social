@@ -249,6 +249,17 @@ async function seedFromR2() {
     const ageH = ((Date.now() - (j.at || 0)) / 3600000).toFixed(1);
     fullCache = { at: j.at || Date.now(), items: j.items, partial: null, building: null, progress: { loaded: j.items.length, total: j.items.length } };
     console.log(`[r2] seeded ${j.items.length} items from R2 (age ${ageH}h)`);
+    // If the seeded catalog predates the History-baking change, force an immediate
+    // rebuild so the next R2 push includes per-strategy History. Without this the
+    // first deploy after the schema change has to wait the full rebuild interval
+    // (default 6h) before users see baked-in sparklines.
+    const sample = j.items.find(it => it && typeof it === 'object');
+    const hasHistory = sample && Array.isArray(sample.History);
+    if (!hasHistory) {
+      console.log('[r2] seeded catalog lacks History → scheduling immediate rebuild to populate it');
+      // Defer to next tick so seed completes; scheduler will pick up at=0 on its next 60s tick.
+      setImmediate(() => { fullCache.at = 0; });
+    }
     return true;
   } catch (e) {
     console.log('[r2] seed failed:', e.message);
