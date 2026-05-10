@@ -17,6 +17,13 @@
   --deposit:     #3FB85A;
   --row-hover:   #1F2226;
   --row-selected:#1F2A3A;
+
+  /* Slider tweaks — override these to recolor RangeDual / RangeSingle */
+  --slider-track:        var(--surface-3);
+  --slider-fill:         #2D7FF9;
+  --slider-thumb:        #2D7FF9;
+  --slider-thumb-border: var(--surface);
+
   --shadow-sm:   0 1px 0 rgba(255,255,255,.03);
   --shadow:      0 1px 0 rgba(255,255,255,.03), 0 8px 24px -16px rgba(0,0,0,.6);
   --shadow-lg:   0 1px 0 rgba(255,255,255,.03), 0 24px 60px -24px rgba(0,0,0,.7);
@@ -50,6 +57,12 @@
   --deposit:     #2E9E45;
   --row-hover:   #F4F6FA;
   --row-selected:#E7EEF8;
+
+  --slider-track:        var(--surface-3);
+  --slider-fill:         #2D7FF9;
+  --slider-thumb:        #2D7FF9;
+  --slider-thumb-border: var(--surface);
+
   --shadow-sm:   0 1px 0 rgba(20,18,14,.04);
   --shadow:      0 1px 0 rgba(20,18,14,.04), 0 8px 24px -16px rgba(20,18,14,.18);
   --shadow-lg:   0 1px 0 rgba(20,18,14,.04), 0 24px 60px -28px rgba(20,18,14,.30);

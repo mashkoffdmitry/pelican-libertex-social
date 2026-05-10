@@ -63,6 +63,11 @@ function fmtAgeI18n(days: number | null): string {
     : t('fmt.age.years', { n: years });
 }
 
+function pnlClass(v: number | null | undefined): string {
+  if (v == null || isNaN(Number(v)) || Number(v) === 0) return '';
+  return Number(v) > 0 ? 'green' : 'red';
+}
+
 const showOpen = ref(false);
 const showClosed = ref(false);
 
@@ -128,23 +133,23 @@ function toggleClosed() {
     <div class="grid">
       <div class="col-stats">
         <div class="field"><div class="label">{{ t('expanded.currency') }}</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.monthlyProfit') }}</div><div class="value">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.yearlyProfit') }}</div><div class="value">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.monthlyProfit') }}</div><div class="value" :class="pnlClass(s.MonthlyProfit)">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.yearlyProfit') }}</div><div class="value" :class="pnlClass(s.YearlyProfit)">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
         <div class="field"><div class="label">{{ t('expanded.balance') }}</div><div class="value">{{ fmtMoneyFull(s.AccountBalance, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.realizedPnl') }}</div><div class="value">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.unrealizedPnl') }}</div><div class="value">{{ fmtMoneyFull(s.UnrealisedPnl, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.realizedPnl') }}</div><div class="value" :class="pnlClass(s.RealisedPnl)">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
+        <div class="field"><div class="label">{{ t('expanded.unrealizedPnl') }}</div><div class="value" :class="pnlClass(s.UnrealisedPnl)">{{ fmtMoneyFull(s.UnrealisedPnl, locale) }}</div></div>
         <div class="field"><div class="label">{{ t('expanded.tradesTotal') }}</div><div class="value">{{ fmtNum(s.TradesTotal, locale) }}</div></div>
         <div class="field">
           <div class="label">{{ t('expanded.winRate') }}</div>
           <div class="value">
-            <span v-if="wr >= 0">{{ wr.toFixed(1) }}% / {{ lr.toFixed(1) }}%</span>
+            <span v-if="wr >= 0"><span class="green">{{ wr.toFixed(1) }}%</span> / <span class="red">{{ lr.toFixed(1) }}%</span></span>
             <span v-else class="dim">—</span>
           </div>
         </div>
       </div>
       <div class="col-donut">
         <div class="hd">{{ t('expanded.markets') }}</div>
-        <MarketsDonut :markets="s.Markets" />
+        <MarketsDonut :markets="s.Markets" :width="320" :height="200" />
       </div>
     </div>
 
@@ -261,26 +266,26 @@ function toggleClosed() {
 
 .pelican-row-expanded {
   position: relative;
-  padding: 16px;
-  padding-top: 44px;
+  padding: 12px 16px;
+  padding-top: 36px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 .close-btn {
   position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
+  top: 8px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface-3);
   color: var(--fg-3);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,40 +298,64 @@ function toggleClosed() {
 }
 .grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr);
+  grid-template-columns: minmax(360px, 2fr) minmax(220px, 1fr);
   gap: 16px;
+  align-items: start;
 }
 .col-stats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-2);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--surface);
 }
 .field .label {
   color: var(--fg-3);
-  font-size: 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 .field .value {
   color: var(--fg);
   font-weight: 500;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 .col-donut .hd {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--fg-3);
   margin-bottom: 6px;
 }
 .trade-toggles {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 .pill {
   cursor: pointer;
-  padding: 6px 14px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--fg);
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 .pill.on {
   background: var(--accent);
@@ -350,6 +379,9 @@ function toggleClosed() {
   }
   .grid {
     grid-template-columns: 1fr;
+  }
+  .col-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

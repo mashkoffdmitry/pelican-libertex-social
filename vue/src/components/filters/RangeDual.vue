@@ -52,12 +52,12 @@ const loPct = computed(() => ((lo.value - rawMin.value) / (rawMax.value - rawMin
 const hiPct = computed(() => ((hi.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
 const trackStyle = computed(() => ({
   background: `linear-gradient(to right,
-    var(--surface-3, #EEF0F2) 0%,
-    var(--surface-3, #EEF0F2) ${loPct.value}%,
-    var(--accent, #F25A24) ${loPct.value}%,
-    var(--accent, #F25A24) ${hiPct.value}%,
-    var(--surface-3, #EEF0F2) ${hiPct.value}%,
-    var(--surface-3, #EEF0F2) 100%)`,
+    var(--slider-track, #EEF0F2) 0%,
+    var(--slider-track, #EEF0F2) ${loPct.value}%,
+    var(--slider-fill, #2D7FF9) ${loPct.value}%,
+    var(--slider-fill, #2D7FF9) ${hiPct.value}%,
+    var(--slider-track, #EEF0F2) ${hiPct.value}%,
+    var(--slider-track, #EEF0F2) 100%)`,
 }));
 
 function onMin(e: Event) {
@@ -87,7 +87,7 @@ function onMax(e: Event) {
         :min="rawMin"
         :max="rawMax"
         :value="lo"
-        :style="{ zIndex: lo <= rawMin || lo >= hi ? 5 : 4 }"
+        :style="{ zIndex: hi >= rawMax ? 5 : 4 }"
         @input="onMin"
         @change="onMin"
       />
@@ -97,7 +97,7 @@ function onMax(e: Event) {
         :min="rawMin"
         :max="rawMax"
         :value="hi"
-        :style="{ zIndex: lo <= rawMin || lo >= hi ? 4 : 5 }"
+        :style="{ zIndex: hi >= rawMax ? 4 : 5 }"
         @input="onMax"
         @change="onMax"
       />
@@ -145,7 +145,11 @@ function onMax(e: Event) {
   background: transparent;
   -webkit-appearance: none;
   appearance: none;
-  pointer-events: auto;
+  /* Track clicks are no-op — only thumb-grabs move handles, which lets the
+     strict clamp in onMin/onMax actually keep lo < hi. Without this, clicking
+     near the left thumb sends the event to whichever input has higher z-index
+     (max input by default) and teleports the wrong handle. */
+  pointer-events: none;
 }
 .range-dual::-webkit-slider-runnable-track {
   background: transparent;
@@ -158,18 +162,20 @@ function onMax(e: Event) {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent, #F25A24);
-  border: 2px solid var(--surface, #16181A);
+  background: var(--slider-thumb, #2D7FF9);
+  border: 2px solid var(--slider-thumb-border, #16181A);
   cursor: pointer;
   margin-top: -6px;
+  pointer-events: auto;
 }
 .range-dual::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent, #F25A24);
-  border: 2px solid var(--surface, #16181A);
+  background: var(--slider-thumb, #2D7FF9);
+  border: 2px solid var(--slider-thumb-border, #16181A);
   cursor: pointer;
+  pointer-events: auto;
 }
 .scale {
   display: flex;

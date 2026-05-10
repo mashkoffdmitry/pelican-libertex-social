@@ -37,24 +37,24 @@ const display = computed(() => {
 
 const trackStyle = computed(() => {
   if (props.modelValue == null) {
-    return { background: 'var(--surface-3, #EEF0F2)' };
+    return { background: 'var(--slider-track, #EEF0F2)' };
   }
   const pct = Math.max(0, Math.min(100, ((raw.value - props.min) / (props.max - props.min)) * 100));
   if (inverted.value) {
     return {
       background: `linear-gradient(to right,
-        var(--surface-3, #EEF0F2) 0%,
-        var(--surface-3, #EEF0F2) ${pct}%,
-        var(--accent, #F25A24) ${pct}%,
-        var(--accent, #F25A24) 100%)`,
+        var(--slider-track, #EEF0F2) 0%,
+        var(--slider-track, #EEF0F2) ${pct}%,
+        var(--slider-fill, #2D7FF9) ${pct}%,
+        var(--slider-fill, #2D7FF9) 100%)`,
     };
   }
   return {
     background: `linear-gradient(to right,
-      var(--accent, #F25A24) 0%,
-      var(--accent, #F25A24) ${pct}%,
-      var(--surface-3, #EEF0F2) ${pct}%,
-      var(--surface-3, #EEF0F2) 100%)`,
+      var(--slider-fill, #2D7FF9) 0%,
+      var(--slider-fill, #2D7FF9) ${pct}%,
+      var(--slider-track, #EEF0F2) ${pct}%,
+      var(--slider-track, #EEF0F2) 100%)`,
   };
 });
 
@@ -124,8 +124,28 @@ function onInput(e: Event) {
   inset: 0;
   width: 100%;
   background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
 }
-.range::-webkit-slider-runnable-track { background: transparent; }
-.range::-moz-range-track             { background: transparent; }
+.range::-webkit-slider-runnable-track { background: transparent; height: 4px; }
+.range::-moz-range-track             { background: transparent; height: 4px; }
 .range::-moz-range-progress          { background: transparent; }
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--slider-thumb, #2D7FF9);
+  border: 2px solid var(--slider-thumb-border, #16181A);
+  cursor: pointer;
+  margin-top: -6px;
+}
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--slider-thumb, #2D7FF9);
+  border: 2px solid var(--slider-thumb-border, #16181A);
+  cursor: pointer;
+}
 </style>
