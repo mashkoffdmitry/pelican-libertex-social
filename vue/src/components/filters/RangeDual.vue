@@ -63,13 +63,13 @@ const trackStyle = computed(() => ({
 function onMin(e: Event) {
   let v = parseInt((e.target as HTMLInputElement).value, 10);
   if (isNaN(v)) return;
-  if (v > hi.value) v = hi.value;
+  if (v >= hi.value) v = hi.value - 1;
   emit('update:modelValueMin', v <= rawMin.value ? null : v);
 }
 function onMax(e: Event) {
   let v = parseInt((e.target as HTMLInputElement).value, 10);
   if (isNaN(v)) return;
-  if (v < lo.value) v = lo.value;
+  if (v <= lo.value) v = lo.value + 1;
   emit('update:modelValueMax', v >= rawMax.value ? null : v);
 }
 </script>
@@ -143,11 +143,34 @@ function onMax(e: Event) {
   inset: 0;
   width: 100%;
   background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
   pointer-events: auto;
 }
-.range-dual::-webkit-slider-runnable-track { background: transparent; }
-.range-dual::-moz-range-track             { background: transparent; }
+.range-dual::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 4px;
+}
+.range-dual::-moz-range-track             { background: transparent; height: 4px; }
 .range-dual::-moz-range-progress          { background: transparent; }
+.range-dual::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #F25A24);
+  border: 2px solid var(--surface, #16181A);
+  cursor: pointer;
+  margin-top: -6px;
+}
+.range-dual::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #F25A24);
+  border: 2px solid var(--surface, #16181A);
+  cursor: pointer;
+}
 .scale {
   display: flex;
   justify-content: space-between;
