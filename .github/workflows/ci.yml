@@ -177,10 +177,13 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
-          MAJOR_MINOR=$(echo "$LAST" | cut -d. -f1,2)
-          PATCH=$(echo "$LAST" | cut -d. -f3)
-          NEW_TAG="${MAJOR_MINOR}.$((PATCH + 1))"
+          # Use global max tag (all refs) so HEAD ancestry doesn't matter when
+          # tags exist on non-ancestor commits (e.g. from other branches).
+          LAST=$(git tag -l '[0-9]*.[0-9]*.[0-9]*' | grep -v -- '-' | sort -V | tail -1)
+          [ -z "$LAST" ] && LAST="0.0.0"
+          MAJOR=$(echo "$LAST" | cut -d. -f1)
+          MINOR=$(echo "$LAST" | cut -d. -f2)
+          NEW_TAG="${MAJOR}.$((MINOR + 1)).0"
           echo "Last tag: $LAST → New tag: $NEW_TAG"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
 
