@@ -36,7 +36,7 @@ const geom = computed(() => donutGeometry(props.markets, props.width, props.heig
         :key="s.marketName + s.fraction"
         :d="s.arcPath"
         :fill="s.color"
-        stroke="var(--card)"
+        stroke="var(--surface)"
         stroke-width="1.5"
       />
     </g>
@@ -60,11 +60,11 @@ const geom = computed(() => donutGeometry(props.markets, props.width, props.heig
         :y="s.labelY"
         :text-anchor="s.labelAnchor"
         font-size="11"
-        fill="var(--text)"
+        fill="var(--fg)"
         font-weight="500"
       >
         {{ s.marketName }}
-        <tspan fill="var(--muted)" font-weight="400">{{ s.count }}</tspan>
+        <tspan fill="var(--fg-3)" font-weight="400">{{ s.count }}</tspan>
       </text>
     </g>
   </svg>

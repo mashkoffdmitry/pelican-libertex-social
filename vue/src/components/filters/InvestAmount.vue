@@ -68,23 +68,23 @@ function onChange(e: Event) {
 }
 .title {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--fg-3);
 }
 .val {
   font-size: 12px;
-  color: var(--text);
+  color: var(--fg);
 }
 input {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--input-bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
 }
 input:focus {
   outline: none;
-  border-color: var(--orange);
+  border-color: var(--accent);
 }
 </style>

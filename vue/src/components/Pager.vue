@@ -47,9 +47,9 @@ function onGoto(e: Event) {
   font-size: 13px;
 }
 .pelican-pager button {
-  background: var(--card);
-  border: 1px solid var(--line);
-  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
   border-radius: 6px;
   padding: 6px 10px;
   cursor: pointer;
@@ -60,28 +60,28 @@ function onGoto(e: Event) {
   cursor: not-allowed;
 }
 .pelican-pager button.page.cur {
-  background: var(--orange);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--orange);
+  border-color: var(--accent);
 }
 .pelican-pager .gap {
   padding: 0 4px;
-  color: var(--muted);
+  color: var(--fg-3);
 }
 .pelican-pager .info {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted);
+  color: var(--fg-3);
   margin-left: 8px;
 }
 .pelican-pager .info input {
   width: 64px;
   padding: 6px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--input-bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
 }
 </style>

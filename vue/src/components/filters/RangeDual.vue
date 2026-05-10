@@ -52,12 +52,12 @@ const loPct = computed(() => ((lo.value - rawMin.value) / (rawMax.value - rawMin
 const hiPct = computed(() => ((hi.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
 const trackStyle = computed(() => ({
   background: `linear-gradient(to right,
-    var(--track-bg, #e2e8f0) 0%,
-    var(--track-bg, #e2e8f0) ${loPct.value}%,
-    var(--accent, #3b82f6) ${loPct.value}%,
-    var(--accent, #3b82f6) ${hiPct.value}%,
-    var(--track-bg, #e2e8f0) ${hiPct.value}%,
-    var(--track-bg, #e2e8f0) 100%)`,
+    var(--surface-3, #EEF0F2) 0%,
+    var(--surface-3, #EEF0F2) ${loPct.value}%,
+    var(--accent, #F25A24) ${loPct.value}%,
+    var(--accent, #F25A24) ${hiPct.value}%,
+    var(--surface-3, #EEF0F2) ${hiPct.value}%,
+    var(--surface-3, #EEF0F2) 100%)`,
 }));
 
 function onMin(e: Event) {
@@ -121,11 +121,11 @@ function onMax(e: Event) {
 }
 .title {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--fg-3);
 }
 .val {
   font-size: 12px;
-  color: var(--text);
+  color: var(--fg);
 }
 .dual-track {
   position: relative;
@@ -151,7 +151,7 @@ function onMax(e: Event) {
 .scale {
   display: flex;
   justify-content: space-between;
-  color: var(--muted);
+  color: var(--fg-3);
   font-size: 11px;
   margin-top: 2px;
 }

@@ -27,7 +27,7 @@ const geom = computed(() => sparklineGeometry(props.history, props.width, props.
     role="img"
     :aria-label="t('spark.empty')"
   >
-    <text x="2" y="20" font-size="11" fill="var(--spark-no-data)">{{ t('spark.empty') }}</text>
+    <text x="2" y="20" font-size="11" fill="var(--fg-4)">{{ t('spark.empty') }}</text>
   </svg>
   <svg
     v-else
@@ -44,20 +44,20 @@ const geom = computed(() => sparklineGeometry(props.history, props.width, props.
       :x2="geom.width"
       :y1="geom.zeroY"
       :y2="geom.zeroY"
-      stroke="var(--grid-line)"
+      stroke="var(--border)"
       stroke-dasharray="2 3"
       stroke-width="1"
       vector-effect="non-scaling-stroke"
     />
     <path
       :d="geom.areaPath"
-      :fill="geom.positive ? 'var(--area-green)' : 'var(--area-red)'"
+      :fill="geom.positive ? 'var(--area-up)' : 'var(--area-down)'"
       stroke="none"
     />
     <path
       :d="geom.linePath"
       fill="none"
-      :stroke="geom.positive ? 'var(--green)' : 'var(--red)'"
+      :stroke="geom.positive ? 'var(--up)' : 'var(--down)'"
       stroke-width="1.6"
       stroke-linejoin="round"
       stroke-linecap="round"

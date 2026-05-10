@@ -103,11 +103,11 @@ function sortClass(col: SortColumn): string {
   grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) auto;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--sage-2);
-  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--fg-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -119,20 +119,20 @@ function sortClass(col: SortColumn): string {
   user-select: none;
 }
 .row.head .sortable:hover {
-  color: var(--text);
+  color: var(--fg);
 }
 .row.head .sortable.active-asc::after {
   content: ' ↑';
-  color: var(--orange);
+  color: var(--accent);
 }
 .row.head .sortable.active-desc::after {
   content: ' ↓';
-  color: var(--orange);
+  color: var(--accent);
 }
 .empty {
   padding: 60px 20px;
   text-align: center;
-  color: var(--muted);
+  color: var(--fg-3);
 }
 @media (max-width: 720px) {
   .row.head {

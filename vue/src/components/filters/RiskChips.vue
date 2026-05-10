@@ -40,16 +40,16 @@ function toggle(level: RiskLevel) {
 .chip {
   cursor: pointer;
   padding: 6px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--card);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
   font-size: 12px;
   transition: background 0.15s, border-color 0.15s;
 }
 .chip:hover {
-  border-color: var(--orange);
+  border-color: var(--accent);
 }
 .chip.risk-low.on {
   background: var(--chip-low-bg);

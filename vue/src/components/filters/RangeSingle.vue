@@ -78,11 +78,11 @@ function onInput(e: Event) {
 }
 .title {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--fg-3);
 }
 .val {
   font-size: 12px;
-  color: var(--text);
+  color: var(--fg);
 }
 .range {
   width: 100%;

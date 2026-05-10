@@ -87,58 +87,58 @@ const countsHtml = computed(() =>
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 .btn-flat {
   background: transparent;
-  border: 1px solid var(--line);
-  color: var(--text);
+  border: 1px solid var(--border);
+  color: var(--fg);
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   font: inherit;
 }
 .btn-flat:hover {
-  border-color: var(--orange);
+  border-color: var(--accent);
 }
 .filters-toggle {
   display: none;
 }
 .counts {
-  color: var(--muted);
+  color: var(--fg-3);
   font-size: 13px;
 }
 .counts b {
-  color: var(--text);
+  color: var(--fg);
 }
 .search {
   flex: 1 1 220px;
   min-width: 160px;
   padding: 8px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
 }
 .search:focus {
   outline: none;
-  border-color: var(--orange);
+  border-color: var(--accent);
 }
 .sort {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted);
+  color: var(--fg-3);
   font-size: 13px;
 }
 .sort select {
   padding: 6px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--input-bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
 }
 @media (max-width: 720px) {

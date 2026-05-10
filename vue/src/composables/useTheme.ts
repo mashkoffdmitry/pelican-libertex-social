@@ -1,7 +1,7 @@
 import { ref, watch, onScopeDispose, type Ref } from 'vue';
 import type { ThemeMode } from '../types/columns';
 
-const STORAGE_KEY = 'pelican-theme';
+const STORAGE_KEY = 'pelican.theme';
 
 export interface UseThemeReturn {
   mode: Ref<ThemeMode>;
@@ -59,7 +59,7 @@ export function useTheme(initial: ThemeMode = 'auto'): UseThemeReturn {
     mode.value = next;
   }
   function cycle() {
-    mode.value = mode.value === 'dark' ? 'light' : mode.value === 'light' ? 'auto' : 'dark';
+    mode.value = mode.value === 'light' ? 'dark' : 'light';
   }
 
   return { mode, resolved, setMode, cycle };

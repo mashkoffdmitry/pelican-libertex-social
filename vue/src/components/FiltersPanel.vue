@@ -204,8 +204,8 @@ function applyInvest(range: { min: number; max: number } | null) {
   flex-direction: column;
   gap: 18px;
   padding: 16px;
-  border-right: 1px solid var(--line);
-  background: var(--card);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
   width: 260px;
   flex: none;
 }
@@ -217,12 +217,12 @@ function applyInvest(range: { min: number; max: number } | null) {
 .ftitle {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
 }
 .btn-reset {
   background: transparent;
   border: none;
-  color: var(--orange);
+  color: var(--accent);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -237,7 +237,7 @@ function applyInvest(range: { min: number; max: number } | null) {
     display: none;
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--border);
   }
   .pelican-filters.open {
     display: flex;

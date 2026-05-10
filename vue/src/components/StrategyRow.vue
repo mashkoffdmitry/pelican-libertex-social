@@ -180,7 +180,7 @@ function toggleClosed() {
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--border-2);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -200,8 +200,8 @@ function toggleClosed() {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--sage);
-  color: var(--text-2);
+  background: var(--surface-3);
+  color: var(--fg-2);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -218,10 +218,10 @@ function toggleClosed() {
 }
 .title {
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
 }
 .by {
-  color: var(--muted);
+  color: var(--fg-3);
   font-size: 12px;
 }
 .free-badge {
@@ -241,7 +241,7 @@ function toggleClosed() {
   text-align: right;
 }
 .signal-link {
-  color: var(--orange);
+  color: var(--accent);
   text-decoration: none;
   font-size: 12px;
 }
@@ -249,19 +249,19 @@ function toggleClosed() {
   text-decoration: underline;
 }
 .green {
-  color: var(--green);
+  color: var(--up);
 }
 .red {
-  color: var(--red);
+  color: var(--down);
 }
 .dim {
-  color: var(--muted);
+  color: var(--fg-3);
 }
 
 .pelican-row-expanded {
   padding: 16px;
-  background: var(--sage-2);
-  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -277,16 +277,16 @@ function toggleClosed() {
   gap: 12px 16px;
 }
 .field .label {
-  color: var(--muted);
+  color: var(--fg-3);
   font-size: 12px;
 }
 .field .value {
-  color: var(--text);
+  color: var(--fg);
   font-weight: 500;
 }
 .col-donut .hd {
   font-weight: 600;
-  color: var(--text);
+  color: var(--fg);
   margin-bottom: 6px;
 }
 .trade-toggles {
@@ -297,15 +297,15 @@ function toggleClosed() {
   cursor: pointer;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--text);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
   font: inherit;
   font-size: 12px;
 }
 .pill.on {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 
@@ -316,7 +316,7 @@ function toggleClosed() {
   }
   .pelican-row > [data-label]::before {
     content: attr(data-label);
-    color: var(--muted);
+    color: var(--fg-3);
     margin-right: 8px;
     font-size: 11px;
   }

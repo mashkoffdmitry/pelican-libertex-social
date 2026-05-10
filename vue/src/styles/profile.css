@@ -24,7 +24,8 @@
 }
 
 /* Dark overrides — parent data-theme="dark" lives on .pelican-libsoc */
-.pelican-libsoc[data-theme="dark"] .pelican-profile {
+.pelican-libsoc:not(.theme-light) .pelican-profile,
+.pelican-libsoc.theme-dark .pelican-profile {
   --pl-bg:       oklch(0.140 0.005 80);
   --pl-surface:  oklch(0.170 0.005 80);
   --pl-surface-2:oklch(0.205 0.005 80);

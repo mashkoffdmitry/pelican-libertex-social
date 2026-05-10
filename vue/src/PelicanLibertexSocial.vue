@@ -23,6 +23,7 @@ import type { SortKey, SortColumn } from './constants/sort';
 import { PAGE_SIZE } from './constants/defaults';
 import { LOCALE_KEY, API_BASE_KEY, CATALOG_BASE_KEY } from './injection-keys';
 import TraderProfileView from './components/TraderProfileView.vue';
+import ThemeToggle from './components/ThemeToggle.vue';
 import './styles/index.css';
 
 const props = withDefaults(
@@ -152,7 +153,7 @@ onMounted(() => catalog.start());
 </script>
 
 <template>
-  <div class="pelican-libsoc" :data-theme="themeApi.resolved.value">
+  <div class="pelican-libsoc" :class="`theme-${themeApi.resolved.value}`">
     <!-- ── Trader Profile view ─────────────────────────────── -->
     <TraderProfileView
       v-if="selectedStrategy"
@@ -170,9 +171,10 @@ onMounted(() => catalog.start());
         <button class="lang-toggle" type="button" :title="i18n.lang.value" @click="i18n.cycleLang">
           {{ i18n.lang.value.toUpperCase() }}
         </button>
-        <button class="theme-toggle" type="button" :title="themeApi.mode.value" @click="themeApi.cycle">
-          <span aria-hidden="true">{{ themeApi.resolved.value === 'dark' ? '🌙' : '☀️' }}</span>
-        </button>
+        <ThemeToggle
+          :theme="themeApi.resolved.value"
+          @change="themeApi.setMode"
+        />
       </header>
 
       <Toolbar
@@ -237,37 +239,29 @@ onMounted(() => catalog.start());
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 .default-brand {
   font-weight: 700;
-  color: var(--text);
-}
-.lang-toggle,
-.theme-toggle {
-  height: 38px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
+  color: var(--fg);
 }
 .lang-toggle {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font: inherit;
   margin-left: auto;
   padding: 0 12px;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
-.theme-toggle {
-  width: 38px;
-  font-size: 16px;
-}
-.lang-toggle:hover,
-.theme-toggle:hover {
-  border-color: var(--orange);
+.lang-toggle:hover {
+  border-color: var(--accent);
 }
 .pelican-main {
   display: flex;
