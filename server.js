@@ -16,24 +16,6 @@ const INDEX_HTML = `<!DOCTYPE html>
   <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
   <style>
     * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
-    body { position:relative; overflow-x:hidden; }
-    body::before, body::after {
-      content:''; position:fixed; pointer-events:none; z-index:0;
-      background-repeat:no-repeat; background-position:center;
-      background-size:contain; filter:saturate(120%);
-    }
-    body::before {
-      background-image:url('/bg-blob.png');
-      width:920px; height:480px; top:-140px; right:-160px;
-      transform:rotate(-12deg); opacity:.42;
-    }
-    body::after {
-      background-image:url('/bg-blob2.png');
-      width:780px; height:580px; bottom:-180px; left:-140px;
-      transform:rotate(18deg); opacity:.30;
-    }
-    html[data-theme="light"] body::before { opacity:.18; }
-    html[data-theme="light"] body::after { opacity:.12; }
   </style>
 </head>
 <body>
@@ -842,6 +824,20 @@ server.listen(PORT, () => {
       }, 1000);
     }
   } else {
-    console.log('no token yet — POST /__ingest from localhost');
+    console.log('[startup] no token yet — will retry initial build once refresher saves one');
+    const t0 = Date.now();
+    const poll = setInterval(() => {
+      const e = readEnv();
+      if (e.ACCESS_TOKEN) {
+        clearInterval(poll);
+        console.log('[startup] token now available — building catalog…');
+        getFull(e.ACCESS_TOKEN).then(items => {
+          console.log(`[startup] full catalog ready: ${items.length} items`);
+        }).catch(err => console.error('[startup] full build failed:', err.message));
+      } else if (Date.now() - t0 > 5 * 60_000) {
+        clearInterval(poll);
+        console.error('[startup] no token after 5min — giving up');
+      }
+    }, 10_000);
   }
 });
