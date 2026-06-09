@@ -27,7 +27,7 @@ const { CookieJar } = require('tough-cookie');
 const AUTHORITY = process.env.LIBERTEX_AUTHORITY || 'https://identity.copy-trade.io';
 const REDIRECT_URI =
   process.env.LIBERTEX_REDIRECT_URI ||
-  'https://libertex.copy-trade.io/authentication/login-callback';
+  'https://libertex.copy-trade.io/bff/login-callback';
 const CLIENT_ID = process.env.LIBERTEX_CLIENT_ID || 'libertexweb';
 const TENANT = process.env.LIBERTEX_TENANT || 'Libertex';
 const SCOPE = process.env.LIBERTEX_SCOPE || 'openid profile email copytrade offline_access';
