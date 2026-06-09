@@ -86,9 +86,10 @@ const countsHtml = computed(() =>
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  padding: 18px 28px 0;
+  max-width: 1640px;
+  margin: 0 auto;
+  background: transparent;
 }
 .btn-flat {
   background: transparent;

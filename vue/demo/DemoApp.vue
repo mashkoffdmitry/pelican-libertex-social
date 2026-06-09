@@ -2,26 +2,11 @@
 import { ref } from 'vue';
 import { PelicanLibertexSocial } from '../src';
 
-// Empty string => requests go to the dev origin (:5173) and Vite's
-// `server.proxy['/api']` forwards them to the proxy on :8787. Using an
-// absolute URL here would trigger cross-origin (CORS) requests instead.
+// Empty string => requests go to the dev origin and Vite's server.proxy['/api']
+// forwards them to the live proxy. An absolute URL would trigger CORS instead.
 const apiBase = ref('');
-const lastError = ref<string | null>(null);
-const lastSelected = ref<number | null>(null);
 </script>
 
 <template>
-  <div style="height:100vh;display:flex;flex-direction:column">
-    <div style="padding:8px;border-bottom:1px solid #ccc;font:12px system-ui;display:flex;gap:12px;align-items:center">
-      <label>API base: <input v-model="apiBase" style="width:280px" /></label>
-      <span v-if="lastSelected != null">selected: #{{ lastSelected }}</span>
-      <span v-if="lastError" style="color:#c33">err: {{ lastError }}</span>
-    </div>
-    <PelicanLibertexSocial
-      :api-base="apiBase"
-      style="flex:1;min-height:0"
-      @select-strategy="(s) => (lastSelected = s.Id)"
-      @error="(e) => (lastError = e.code + ': ' + e.message)"
-    />
-  </div>
+  <PelicanLibertexSocial :api-base="apiBase" />
 </template>

@@ -50,14 +50,13 @@ const rangeText = computed(() => {
 
 const loPct = computed(() => ((lo.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
 const hiPct = computed(() => ((hi.value - rawMin.value) / (rawMax.value - rawMin.value)) * 100);
+// Feed only two CSS custom properties to the track. The rail + between-thumbs
+// fill are painted by real 4px-tall ::before/::after pseudo-elements in scoped
+// CSS (like the reference), so there is no background-size to be reset and the
+// fill can never balloon to the full element height.
 const trackStyle = computed(() => ({
-  background: `linear-gradient(to right,
-    var(--slider-track, #EEF0F2) 0%,
-    var(--slider-track, #EEF0F2) ${loPct.value}%,
-    var(--slider-fill, #2D7FF9) ${loPct.value}%,
-    var(--slider-fill, #2D7FF9) ${hiPct.value}%,
-    var(--slider-track, #EEF0F2) ${hiPct.value}%,
-    var(--slider-track, #EEF0F2) 100%)`,
+  '--lo': `${loPct.value}%`,
+  '--hi': `${hiPct.value}%`,
 }));
 
 function onMin(e: Event) {
@@ -88,7 +87,7 @@ function onMax(e: Event) {
   <div class="pelican-fgroup">
     <div class="title-row">
       <label class="title">{{ label }}</label>
-      <span class="val">{{ rangeText }}</span>
+      <span class="val" :class="{ dim: lo <= rawMin && hi >= rawMax }">{{ rangeText }}</span>
     </div>
     <div class="dual-track" :style="trackStyle">
       <input
@@ -130,23 +129,53 @@ function onMax(e: Event) {
   align-items: baseline;
 }
 .title {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
   color: var(--fg-3);
 }
 .val {
   font-size: 12px;
-  color: var(--fg);
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.val.dim {
+  color: var(--fg-3);
+  font-weight: 500;
 }
 .dual-track {
   position: relative;
   height: 24px;
   display: flex;
   align-items: center;
-  border-radius: 4px;
-  /* height matches native track (~4px). Applied via background-size so it aligns vertically */
-  background-size: 100% 4px;
-  background-repeat: no-repeat;
-  background-position: center;
+}
+/* Unfilled rail — full-width 4px strip. */
+.dual-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--slider-track);
+}
+/* Filled segment — only between the two thumbs, driven by --lo/--hi. */
+.dual-track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: var(--lo, 0%);
+  right: calc(100% - var(--hi, 100%));
+  height: 4px;
+  border-radius: 2px;
+  background: var(--slider-fill);
+  pointer-events: none;
 }
 .dual-track .range-dual {
   position: absolute;
@@ -169,29 +198,56 @@ function onMax(e: Event) {
 .range-dual::-moz-range-progress          { background: transparent; }
 .range-dual::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--slider-thumb, #2D7FF9);
-  border: 2px solid var(--slider-thumb-border, #16181A);
+  background: var(--slider-thumb);
+  border: 2px solid var(--slider-thumb-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
   cursor: pointer;
-  margin-top: -6px;
+  /* Center the 18px thumb on the 4px runnable-track: -(18-4)/2 = -7px. */
+  margin-top: -7px;
   pointer-events: auto;
+  position: relative;
+  z-index: 2;
+  transition: transform .15s, box-shadow .25s;
+}
+.range-dual:hover::-webkit-slider-thumb,
+.range-dual:active::-webkit-slider-thumb,
+.range-dual:focus::-webkit-slider-thumb {
+  transform: scale(1.18);
+  z-index: 3;
+  box-shadow: 0 0 0 6px rgba(239, 124, 70, .18), 0 1px 4px rgba(0, 0, 0, .3);
 }
 .range-dual::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--slider-thumb, #2D7FF9);
-  border: 2px solid var(--slider-thumb-border, #16181A);
+  background: var(--slider-thumb);
+  border: 2px solid var(--slider-thumb-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
   cursor: pointer;
   pointer-events: auto;
+  transition: transform .15s, box-shadow .25s;
+}
+.range-dual:hover::-moz-range-thumb,
+.range-dual:active::-moz-range-thumb,
+.range-dual:focus::-moz-range-thumb {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 6px rgba(239, 124, 70, .18), 0 1px 4px rgba(0, 0, 0, .3);
 }
 .scale {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   color: var(--fg-3);
-  font-size: 11px;
-  margin-top: 2px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  pointer-events: none;
+  margin-top: 8px;
 }
+.scale span:nth-child(1) { text-align: left; }
+.scale span:nth-child(2) { text-align: center; }
+.scale span:nth-child(3) { text-align: right; }
 </style>

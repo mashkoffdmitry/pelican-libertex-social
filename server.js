@@ -6,7 +6,7 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.5';
+const PKG_VERSION = '0.4.6';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -846,8 +846,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- static blobs ----
-  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png') {
+  // ---- static assets (blobs + brand logo) ----
+  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png' || u.pathname === '/logo.png') {
     const file = path.join(__dirname, u.pathname.slice(1));
     if (fs.existsSync(file)) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });

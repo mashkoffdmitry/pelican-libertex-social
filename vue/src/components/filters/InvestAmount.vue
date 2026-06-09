@@ -41,7 +41,7 @@ function onChange(e: Event) {
   <div class="pelican-fgroup">
     <div class="title-row">
       <label class="title">{{ t('filters.investAmount') }}</label>
-      <span class="val">{{ display }}</span>
+      <span class="val" :class="{ dim: modelValue == null }">{{ display }}</span>
     </div>
     <input
       type="number"
@@ -67,12 +67,21 @@ function onChange(e: Event) {
   align-items: baseline;
 }
 .title {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
   color: var(--fg-3);
 }
 .val {
   font-size: 12px;
-  color: var(--fg);
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.val.dim {
+  color: var(--fg-3);
+  font-weight: 500;
 }
 input {
   width: 100%;

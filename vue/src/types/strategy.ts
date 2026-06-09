@@ -45,15 +45,20 @@ export interface Strategy {
   _enrichAttempted?: boolean;
 }
 
+// Shape returned by /api/strategies/{id}/signals/{open|closed}.
+// Open trades carry CurrentPrice + UnrealisedProfit; closed trades carry
+// ClosePrice + CloseTimestamp + RealisedProfit.
 export interface Trade {
-  Id?: number;
-  MarketName?: string;
-  OpenTimestamp?: string;
-  CloseTimestamp?: string | null;
+  Instrument?: string;
+  TradeId?: string | number;
   Direction?: 'Buy' | 'Sell' | string;
-  Pnl?: number;
-  Volume?: number;
-  Multiplier?: number;
+  Quantity?: number;
   OpenPrice?: number;
+  OpenTimestamp?: string;
+  CurrentPrice?: number;
   ClosePrice?: number;
+  CloseTimestamp?: string | null;
+  UnrealisedProfit?: number;
+  RealisedProfit?: number;
+  CurrencyCode?: string;
 }

@@ -202,12 +202,14 @@ function applyInvest(range: { min: number; max: number } | null) {
 .pelican-filters {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 16px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  width: 260px;
-  flex: none;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+          backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, .10), inset 0 -1px 0 rgba(0, 0, 0, .18);
 }
 .ftitle-row {
   display: flex;
@@ -215,21 +217,30 @@ function applyInvest(range: { min: number; max: number } | null) {
   align-items: baseline;
 }
 .ftitle {
-  font-size: 13px;
+  display: block;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--fg-3);
 }
 .btn-reset {
   background: transparent;
-  border: none;
+  border: 1.5px solid var(--accent);
   color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
+  padding: 5px 10px;
+  border-radius: 14px;
+  letter-spacing: .2px;
+  transition: background .15s, color .15s, transform .15s;
 }
 .btn-reset:hover {
-  text-decoration: underline;
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: scale(1.03);
 }
 
 @media (max-width: 720px) {

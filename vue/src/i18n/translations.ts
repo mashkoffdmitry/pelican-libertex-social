@@ -98,6 +98,9 @@ const en = {
   'expanded.unrealizedPnl': 'Unrealized P/L',
   'expanded.tradesTotal': 'Trades total',
   'expanded.winRate': 'Win rate',
+  'expanded.lossRate': 'Loss rate',
+  'expanded.risk': 'Risk',
+  'expanded.age': 'Age',
   'expanded.markets': 'Markets',
 
   // Trade-pill toggles
@@ -213,6 +216,9 @@ const ru: Record<TranslationKey, string> = {
   'expanded.unrealizedPnl': 'Нереализованная П/У',
   'expanded.tradesTotal': 'Всего сделок',
   'expanded.winRate': 'Доля прибыльных',
+  'expanded.lossRate': 'Доля убыточных',
+  'expanded.risk': 'Риск',
+  'expanded.age': 'Возраст',
   'expanded.markets': 'Рынки',
 
   'trades.hide': 'Скрыть',

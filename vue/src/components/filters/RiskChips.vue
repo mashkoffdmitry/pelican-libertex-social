@@ -51,19 +51,10 @@ function toggle(level: RiskLevel) {
 .chip:hover {
   border-color: var(--accent);
 }
-.chip.risk-low.on {
-  background: var(--chip-low-bg);
-  color: var(--chip-low-text);
-  border-color: var(--chip-low-bg);
-}
-.chip.risk-medium.on {
-  background: var(--chip-med-bg);
-  color: var(--chip-med-text);
-  border-color: var(--chip-med-bg);
-}
-.chip.risk-high.on {
-  background: var(--chip-high-bg);
-  color: var(--chip-high-text);
-  border-color: var(--chip-high-bg);
+.chip.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(239, 124, 70, .35);
 }
 </style>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue';
 import Sparkline from './Sparkline.vue';
-import MarketsDonut from './MarketsDonut.vue';
 import TradesPanel from './TradesPanel.vue';
 import { useI18n } from '../composables/useI18n';
 import type { Strategy } from '../types/strategy';
@@ -43,6 +42,7 @@ const profileName = computed(
   () => props.s.Profile?.Name ?? (props.s.Profile?.Id ? '#' + props.s.Profile.Id : ''),
 );
 const link = computed(() => `https://libertex.copy-trade.io/strategy/${props.s.Id}`);
+const risk = computed(() => props.s.RiskProfile ?? 'Unsuitable');
 
 // Localised wrappers around format.ts helpers — those are language-agnostic and
 // return literal "free" / "5d" / "3mo". Translate at the call site so that
@@ -130,35 +130,38 @@ function toggleClosed() {
 
   <div v-if="expanded" class="pelican-row-expanded" @click.stop>
     <button class="close-btn" type="button" aria-label="Close" @click="emit('toggle')">✕</button>
-    <div class="grid">
-      <div class="col-stats">
-        <div class="field"><div class="label">{{ t('expanded.currency') }}</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.monthlyProfit') }}</div><div class="value" :class="pnlClass(s.MonthlyProfit)">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.yearlyProfit') }}</div><div class="value" :class="pnlClass(s.YearlyProfit)">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.balance') }}</div><div class="value">{{ fmtMoneyFull(s.AccountBalance, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.realizedPnl') }}</div><div class="value" :class="pnlClass(s.RealisedPnl)">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.unrealizedPnl') }}</div><div class="value" :class="pnlClass(s.UnrealisedPnl)">{{ fmtMoneyFull(s.UnrealisedPnl, locale) }}</div></div>
-        <div class="field"><div class="label">{{ t('expanded.tradesTotal') }}</div><div class="value">{{ fmtNum(s.TradesTotal, locale) }}</div></div>
-        <div class="field">
-          <div class="label">{{ t('expanded.winRate') }}</div>
-          <div class="value">
-            <span v-if="wr >= 0"><span class="green">{{ wr.toFixed(1) }}%</span> / <span class="red">{{ lr.toFixed(1) }}%</span></span>
-            <span v-else class="dim">—</span>
-          </div>
+    <div class="details">
+      <div class="field"><div class="label">{{ t('expanded.monthlyProfit') }}</div><div class="value" :class="pnlClass(s.MonthlyProfit)">{{ fmtMoneyFull(s.MonthlyProfit, locale) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.balance') }}</div><div class="value">{{ fmtMoneyFull(s.AccountBalance, locale) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.realizedPnl') }}</div><div class="value" :class="pnlClass(s.RealisedPnl)">{{ fmtMoneyFull(s.RealisedPnl, locale) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.risk') }}</div><div class="value"><span class="pill" :class="risk">{{ t(`risk.${risk}`) }}</span></div></div>
+      <div class="field"><div class="label">{{ t('expanded.winRate') }}</div><div class="value"><span v-if="wr >= 0" class="green">{{ wr.toFixed(0) }}%</span><span v-else class="dim">—</span></div></div>
+      <div class="field"><div class="label">{{ t('expanded.lossRate') }}</div><div class="value"><span v-if="lr >= 0" class="red">{{ lr.toFixed(0) }}%</span><span v-else class="dim">—</span></div></div>
+      <div class="field"><div class="label">{{ t('expanded.age') }}</div><div class="value">{{ fmtAgeI18n(age) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.tradesTotal') }}</div><div class="value">{{ fmtNum(s.TradesTotal, locale) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.yearlyProfit') }}</div><div class="value" :class="pnlClass(s.YearlyProfit)">{{ fmtMoneyFull(s.YearlyProfit, locale) }}</div></div>
+      <div class="field"><div class="label">{{ t('expanded.currency') }}</div><div class="value">{{ s.Currency ?? 'USD' }}</div></div>
+      <div class="field markets">
+        <div class="label">{{ t('expanded.markets') }}</div>
+        <div class="value markets-list">
+          <template v-if="s.Markets && s.Markets.length">
+            <span v-for="m in s.Markets" :key="m.n" class="market-tag" :title="m.c + ' trades'">{{ m.n }} <span class="market-count">{{ m.c }}</span></span>
+          </template>
+          <span v-else class="dim">{{ t('donut.empty') }}</span>
         </div>
-      </div>
-      <div class="col-donut">
-        <div class="hd">{{ t('expanded.markets') }}</div>
-        <MarketsDonut :markets="s.Markets" :width="320" :height="200" />
       </div>
     </div>
 
     <div class="trade-toggles">
-      <button class="pill" :class="{ on: showOpen }" type="button" @click="toggleOpen">
-        {{ showOpen ? t('trades.hide') : t('trades.openTrades') }}
+      <button class="trades-toggle" :class="{ open: showOpen }" type="button" @click="toggleOpen">
+        <span class="trades-chev">▸</span>
+        <span>{{ t('trades.openTrades') }}</span>
+        <span v-if="openTrades && openTrades.trades" class="trades-count">{{ openTrades.trades.length }}</span>
       </button>
-      <button class="pill" :class="{ on: showClosed }" type="button" @click="toggleClosed">
-        {{ showClosed ? t('trades.hide') : t('trades.tradeHistory') }}
+      <button class="trades-toggle" :class="{ open: showClosed }" type="button" @click="toggleClosed">
+        <span class="trades-chev">▸</span>
+        <span>{{ t('trades.tradeHistory') }}</span>
+        <span v-if="closedTrades && closedTrades.trades" class="trades-count">{{ closedTrades.trades.length }}</span>
       </button>
     </div>
 
@@ -192,6 +195,7 @@ function toggleClosed() {
 }
 .pelican-row:hover {
   background: var(--row-hover);
+  box-shadow: inset 3px 0 0 0 var(--accent);
 }
 .pelican-row.open {
   background: var(--row-hover);
@@ -206,9 +210,9 @@ function toggleClosed() {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--surface-3);
-  color: var(--fg-2);
-  font-weight: 600;
+  background: linear-gradient(135deg, #ef7c46, #ff6633);
+  color: #fff;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -238,6 +242,11 @@ function toggleClosed() {
   padding: 1px 6px;
   border-radius: 999px;
   font-weight: 700;
+  animation: free-pulse 2.4s ease-in-out infinite;
+}
+@keyframes free-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(78, 217, 140, .35); }
+  50% { box-shadow: 0 0 0 5px rgba(78, 217, 140, 0); }
 }
 .c-num {
   text-align: right;
@@ -247,12 +256,42 @@ function toggleClosed() {
   text-align: right;
 }
 .signal-link {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
   color: var(--accent);
   text-decoration: none;
   font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background .15s, color .15s, transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .25s;
+}
+.signal-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .28) 50%, transparent 70%);
+  transform: translateX(-130%);
+  pointer-events: none;
+  transition: transform 0s;
 }
 .signal-link:hover {
-  text-decoration: underline;
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(239, 124, 70, .35);
+}
+.signal-link:hover::after {
+  transform: translateX(130%);
+  transition: transform .85s cubic-bezier(.25, .1, .25, 1);
 }
 .green {
   color: var(--up);
@@ -293,74 +332,130 @@ function toggleClosed() {
   line-height: 1;
 }
 .close-btn:hover {
-  border-color: var(--border-2);
+  border-color: var(--accent);
   color: var(--fg);
+  transform: rotate(90deg);
 }
-.grid {
+.details {
   display: grid;
-  grid-template-columns: minmax(360px, 2fr) minmax(220px, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-.col-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--border-2);
-  border: 1px solid var(--border-2);
-  border-radius: 6px;
-  overflow: hidden;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  background: var(--surface);
+  gap: 4px;
+  padding: 6px 0;
 }
 .field .label {
   color: var(--fg-3);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 500;
+  letter-spacing: 0.06em;
+  font-weight: 600;
 }
 .field .value {
   color: var(--fg);
-  font-weight: 500;
-  font-size: 13px;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 600;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
-.col-donut .hd {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  color: var(--fg-3);
-  margin-bottom: 6px;
+.field.markets {
+  grid-column: 1 / -1;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--border);
 }
-.trade-toggles {
+.markets-list {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+.market-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--fg);
+}
+.market-count {
+  color: var(--fg-3);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .pill {
-  cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--fg);
-  font: inherit;
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  line-height: 1.3;
   font-weight: 600;
 }
-.pill.on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+.pill.Low { background: var(--chip-low-bg); color: var(--chip-low-text); }
+.pill.Medium { background: var(--chip-med-bg); color: var(--chip-med-text); }
+.pill.High { background: var(--chip-high-bg); color: var(--chip-high-text); }
+.pill.Unsuitable { background: var(--chip-uns-bg); color: var(--chip-uns-text); }
+.trade-toggles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.trades-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: rgba(239, 124, 70, .10);
+  border: 1.5px solid rgba(239, 124, 70, .32);
+  border-radius: 8px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s, border-color .2s, transform .25s cubic-bezier(.2, .8, .2, 1), box-shadow .25s;
+}
+.trades-toggle:hover {
+  background: rgba(239, 124, 70, .18);
+  border-color: rgba(239, 124, 70, .55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 124, 70, .20);
+}
+.trades-toggle.open {
+  background: rgba(239, 124, 70, .18);
+  border-color: rgba(239, 124, 70, .45);
+}
+.trades-chev {
+  font-size: 13px;
+  line-height: 1;
+  transition: transform .2s;
+}
+.trades-toggle.open .trades-chev {
+  transform: rotate(90deg);
+}
+.trades-count {
+  margin-left: 2px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .10);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1024px) {
+  .details {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 720px) {
@@ -377,10 +472,7 @@ function toggleClosed() {
   .no-hist {
     display: none;
   }
-  .grid {
-    grid-template-columns: 1fr;
-  }
-  .col-stats {
+  .details {
     grid-template-columns: repeat(2, 1fr);
   }
 }

@@ -3,6 +3,7 @@ import { onMounted, provide, reactive, ref, toRef, watch } from 'vue';
 import Toolbar from './components/Toolbar.vue';
 import FiltersPanel from './components/FiltersPanel.vue';
 import StrategyTable from './components/StrategyTable.vue';
+import WelcomeModal from './components/WelcomeModal.vue';
 import ProgressBar from './components/ProgressBar.vue';
 import { useTheme } from './composables/useTheme';
 import { useCatalog } from './composables/useCatalog';
@@ -154,7 +155,13 @@ onMounted(() => catalog.start());
   <div class="pelican-libsoc" :class="`theme-${themeApi.resolved.value}`">
     <header class="brand-row">
         <slot name="brand">
-          <div class="default-brand">{{ t('app.brand') }}</div>
+          <a class="brand" href="https://libertex.copy-trade.io/" target="_blank" rel="noopener">
+            <span class="logo-tile"><img src="/logo.png" alt="" /></span>
+            <span class="brand-text">
+              <span class="brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>
+              <span class="brand-sub">Copy Trading</span>
+            </span>
+          </a>
         </slot>
         <button class="lang-toggle" type="button" :title="i18n.lang.value" @click="i18n.cycleLang">
           {{ i18n.lang.value.toUpperCase() }}
@@ -217,6 +224,8 @@ onMounted(() => catalog.start());
           </template>
         </StrategyTable>
       </main>
+
+      <WelcomeModal />
   </div>
 </template>
 
@@ -225,9 +234,67 @@ onMounted(() => catalog.start());
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  background: var(--glass-header-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+          backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 -1px 0 rgba(0, 0, 0, .18);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.logo-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(239, 124, 70, .25);
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .25s;
+}
+.logo-tile img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.brand:hover .logo-tile {
+  transform: scale(1.06) rotate(-3deg);
+  box-shadow: 0 4px 16px rgba(239, 124, 70, .40);
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.brand-name {
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 19px;
+  color: var(--fg);
+  text-transform: uppercase;
+}
+.brand-name span {
+  display: block;
+  white-space: nowrap;
+}
+.brand-sub {
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 13.7px;
+  letter-spacing: 0.02em;
+  color: var(--fg-3);
+  white-space: nowrap;
 }
 .default-brand {
   font-weight: 700;
@@ -236,7 +303,7 @@ onMounted(() => catalog.start());
 .lang-toggle {
   height: 38px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: transparent;
   color: var(--fg);
   cursor: pointer;
@@ -244,20 +311,26 @@ onMounted(() => catalog.start());
   margin-left: auto;
   padding: 0 12px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
+  transition: border-color .15s, color .15s;
 }
 .lang-toggle:hover {
   border-color: var(--accent);
+  color: var(--accent);
 }
 .pelican-main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 18px 24px;
+  padding: 24px 28px 60px;
+  max-width: 1640px;
+  margin: 0 auto;
+  align-items: start;
 }
-@media (max-width: 720px) {
+@media (max-width: 980px) {
   .pelican-main {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 }
 </style>
