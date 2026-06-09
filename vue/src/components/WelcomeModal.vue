@@ -96,7 +96,7 @@ watch(lang, (l) => {
       <button class="welcome-close" type="button" :aria-label="tx.close" @click="dismiss">×</button>
 
       <div class="welcome-brand">
-        <span class="welcome-logo-tile" aria-hidden="true"><img src="/logo.png" alt="" /></span>
+        <span class="welcome-logo-tile" aria-hidden="true"><img :src="'/logo.png'" alt="" /></span>
         <span class="welcome-brand-text">
           <span class="welcome-brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>
           <span class="welcome-brand-sub">{{ tx.sub }}</span>

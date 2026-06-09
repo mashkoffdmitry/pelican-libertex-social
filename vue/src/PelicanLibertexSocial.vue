@@ -156,7 +156,7 @@ onMounted(() => catalog.start());
     <header class="brand-row">
         <slot name="brand">
           <a class="brand" href="https://libertex.copy-trade.io/" target="_blank" rel="noopener">
-            <span class="logo-tile"><img src="/logo.png" alt="" /></span>
+            <span class="logo-tile"><img :src="'/logo.png'" alt="" /></span>
             <span class="brand-text">
               <span class="brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>
               <span class="brand-sub">Copy Trading</span>
