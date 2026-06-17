@@ -10,9 +10,10 @@ const SUPPRESS_MS = 30 * 60 * 1000;
 const open = ref(false);
 const videoSrc = ref('');
 
-const YT: Record<'en' | 'ru', string> = {
+const YT: Record<'en' | 'ru' | 'es', string> = {
   ru: 'https://www.youtube-nocookie.com/embed/nVI14i504ek?rel=0&modestbranding=1&playsinline=1',
   en: 'https://www.youtube-nocookie.com/embed/pirGY80mHxs?rel=0&modestbranding=1&playsinline=1',
+  es: 'https://www.youtube-nocookie.com/embed/pirGY80mHxs?rel=0&modestbranding=1&playsinline=1',
 };
 
 interface Step { t: string; d: string }
@@ -21,7 +22,7 @@ interface WelcomeText {
   steps: Step[]; bonus: Step; cta: string; tagline: string; close: string; sub: string;
 }
 
-const TEXT: Record<'en' | 'ru', WelcomeText> = {
+const TEXT: Record<'en' | 'ru' | 'es', WelcomeText> = {
   en: {
     title: 'Start earning more by copying the trades of professionals on Libertex',
     desc: 'Why learn from your own mistakes when you can adopt the experience of the best? Connect to successful traders, copy their strategies, and earn on the financial markets — <b>suitable even for those with no trading experience</b>. Smart trading and fast growth!',
@@ -56,16 +57,33 @@ const TEXT: Record<'en' | 'ru', WelcomeText> = {
     close: 'Закрыть',
     sub: 'Copy Trading',
   },
+  es: {
+    title: 'Empieza a ganar más copiando las operaciones de profesionales en Libertex',
+    desc: '¿Para qué aprender de tus propios errores si puedes aprovechar la experiencia de los mejores? Conéctate con traders exitosos, copia sus estrategias y gana en los mercados financieros — <b>apto incluso para quienes no tienen experiencia en trading</b>. ¡Trading inteligente y crecimiento rápido!',
+    howItWorks: 'Cómo funciona',
+    steps: [
+      { t: 'Descarga la app', d: 'Disponible para iOS y Android' },
+      { t: 'Registro rápido', d: 'Usa el e-mail de tu cuenta de Libertex' },
+      { t: 'Vincula tu cuenta de MetaTrader', d: 'Copia los datos de la sección «Más» en la app de Libertex y pégalos en la sección «Cuenta» de la app de Copy&nbsp;Trading' },
+      { t: 'Elige un top trader', d: 'Explora los perfiles y elige uno cuya estrategia se ajuste a ti' },
+      { t: 'Copiado automático', d: 'El sistema replica las operaciones del trader elegido en tiempo real' },
+    ],
+    bonus: { t: 'Sigue el resultado', d: 'Monitorea la rentabilidad, cambia ajustes o pausa cuando quieras' },
+    cta: 'Empezar ahora',
+    tagline: '¡Deja que la experiencia de los expertos trabaje para ti!',
+    close: 'Cerrar',
+    sub: 'Copy Trading',
+  },
 };
 
-const tx = computed<WelcomeText>(() => TEXT[lang.value === 'ru' ? 'ru' : 'en']);
+const tx = computed<WelcomeText>(() => TEXT[lang.value] ?? TEXT.en);
 
 function lockScroll(on: boolean) {
   try { document.body.style.overflow = on ? 'hidden' : ''; } catch { /* ignore */ }
 }
 
 function openModal() {
-  videoSrc.value = YT[lang.value === 'ru' ? 'ru' : 'en'];
+  videoSrc.value = YT[lang.value] ?? YT.en;
   open.value = true;
   lockScroll(true);
 }
@@ -85,7 +103,7 @@ onMounted(() => {
 
 // keep the video language in sync if the user switches language while open
 watch(lang, (l) => {
-  if (open.value) videoSrc.value = YT[l === 'ru' ? 'ru' : 'en'];
+  if (open.value) videoSrc.value = YT[l] ?? YT.en;
 });
 </script>
 

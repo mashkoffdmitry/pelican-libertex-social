@@ -4,6 +4,7 @@ import type { FiltersState } from '../types/filters';
 import { defaultFilters } from '../types/filters';
 import { winrate } from '../utils/winrate';
 import { ageDays } from '../utils/format';
+import { AGE_BUCKETS, COPIER_BUCKETS, inAnyBucket } from '../constants/buckets';
 
 export interface UseFiltersReturn {
   filters: Reactive<FiltersState>;
@@ -27,12 +28,12 @@ export function useFilters(
   function reset() {
     const fresh = defaultFilters();
     filters.risk = fresh.risk;
-    filters.retMin = null;
+    filters.ageBuckets = fresh.ageBuckets;
+    filters.copierBuckets = fresh.copierBuckets;
+    filters.retMin = fresh.retMin;
     filters.retMax = null;
     filters.ddMax = null;
     filters.aumMin = null;
-    filters.copiersMin = null;
-    filters.ageMin = null;
     filters.tradesMin = null;
     filters.winrateMin = null;
     filters.feeMax = null;
@@ -57,7 +58,8 @@ function passes(s: Strategy, f: FiltersState): boolean {
   if (f.risk.size && s.RiskProfile && !f.risk.has(s.RiskProfile)) return false;
   if (s.IsSimulated) return false;
   if (s._stats && !s.TradesTotal) return false;
-  if (f.copiersMin != null && (s.NumCopiers ?? 0) < f.copiersMin) return false;
+  if (f.copierBuckets.size && !inAnyBucket(s.NumCopiers ?? 0, COPIER_BUCKETS, f.copierBuckets))
+    return false;
   if (f.aumMin != null && (s.CopiersAUM ?? 0) < f.aumMin) return false;
   if (f.balanceMin != null && (s.AccountBalance ?? 0) < f.balanceMin) return false;
   if (f.balanceMax != null && (s.AccountBalance ?? Infinity) > f.balanceMax) return false;
@@ -66,7 +68,8 @@ function passes(s: Strategy, f: FiltersState): boolean {
   const wr = winrate(s);
   if (f.winrateMin != null && (wr < 0 || wr < f.winrateMin)) return false;
   const age = ageDays(s.Inception);
-  if (f.ageMin != null && (age == null || age < f.ageMin)) return false;
+  if (f.ageBuckets.size && (age == null || !inAnyBucket(age, AGE_BUCKETS, f.ageBuckets)))
+    return false;
   if (f.retMin != null && (s.Return == null || s.Return < f.retMin)) return false;
   if (f.retMax != null && (s.Return == null || s.Return > f.retMax)) return false;
   if (f.ddMax != null && s.MaxDD != null && Math.abs(s.MaxDD) > f.ddMax) return false;

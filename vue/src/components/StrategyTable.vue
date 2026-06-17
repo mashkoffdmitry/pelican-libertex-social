@@ -106,7 +106,7 @@ function sortClass(col: SortColumn): string {
 }
 .row.head {
   display: grid;
-  grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) auto;
+  grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) 112px;
   gap: 12px;
   padding: 12px 16px;
   background: var(--glass-head-bg);

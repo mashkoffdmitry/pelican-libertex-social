@@ -12,7 +12,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY server.js refresher.js oidc-client.js r2-uploader.js start.sh bg-blob.png bg-blob2.png logo.png ./
+COPY server.js refresher.js oidc-client.js r2-uploader.js start.sh bg-blob.png bg-blob2.png logo.png favicon.png ./
 
 RUN chmod +x start.sh && \
     addgroup -S app && adduser -S -G app -h /home/app app && \

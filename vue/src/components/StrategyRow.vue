@@ -38,9 +38,6 @@ const dd = computed(() => (props.s.MaxDD != null ? fmtPct(props.s.MaxDD, 2) : nu
 const age = computed(() => ageDays(props.s.Inception));
 const wr = computed(() => winrate(props.s));
 const lr = computed(() => (wr.value >= 0 ? 100 - wr.value : -1));
-const profileName = computed(
-  () => props.s.Profile?.Name ?? (props.s.Profile?.Id ? '#' + props.s.Profile.Id : ''),
-);
 const link = computed(() => `https://libertex.copy-trade.io/strategy/${props.s.Id}`);
 const risk = computed(() => props.s.RiskProfile ?? 'Unsuitable');
 
@@ -101,7 +98,6 @@ function toggleClosed() {
           {{ s.Name || '#' + s.Id }}
           <span v-if="s._meta && s.Fee == null" class="free-badge">{{ t('row.free') }}</span>
         </div>
-        <div class="by">{{ profileName }}</div>
       </div>
     </div>
     <div class="c-spark" :class="{ 'no-hist': !s.History?.length }" :data-label="t('row.dataLabel.equityCurve')">
@@ -185,7 +181,7 @@ function toggleClosed() {
 <style scoped>
 .pelican-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) auto;
+  grid-template-columns: minmax(160px, 1.6fr) minmax(120px, 1fr) repeat(7, minmax(70px, 0.8fr)) 112px;
   gap: 12px;
   align-items: center;
   padding: 10px 16px;
@@ -229,10 +225,6 @@ function toggleClosed() {
 .title {
   font-weight: 600;
   color: var(--fg);
-}
-.by {
-  color: var(--fg-3);
-  font-size: 12px;
 }
 .free-badge {
   margin-left: 6px;

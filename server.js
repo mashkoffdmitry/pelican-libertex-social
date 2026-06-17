@@ -6,13 +6,14 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.6';
+const PKG_VERSION = '0.4.7';
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Libertex Social — Copy Trading</title>
+  <title>Libertex Social</title>
+  <link rel="icon" type="image/png" href="/logo.png">
   <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
   <style>
     * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
@@ -846,8 +847,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- static assets (blobs + brand logo) ----
-  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png' || u.pathname === '/logo.png') {
+  // ---- static assets (blobs + brand logo + favicon) ----
+  if (u.pathname === '/bg-blob.png' || u.pathname === '/bg-blob2.png' || u.pathname === '/logo.png' || u.pathname === '/favicon.png') {
     const file = path.join(__dirname, u.pathname.slice(1));
     if (fs.existsSync(file)) {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });

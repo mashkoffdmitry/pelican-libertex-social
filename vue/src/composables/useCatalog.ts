@@ -2,6 +2,7 @@ import { computed, onScopeDispose, ref, shallowRef, triggerRef, type Ref } from 
 import type { Strategy, HistoryPoint } from '../types/strategy';
 import type { ProgressResponse } from '../types/api';
 import { api, joinUrl, type PelicanError } from '../utils/http';
+import { riskFromDrawdown } from '../utils/risk';
 import {
   PARTIAL_REPAINT_INTERVAL_MS,
   PROGRESS_POLL_INTERVAL_MS,
@@ -72,7 +73,12 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
       const items = await api<Strategy[]>(url, catalogOrigin());
       total.value = items.length;
       const m = byIdRef.value;
-      for (const it of items) m.set(it.Id, { ...m.get(it.Id), ...it } as Strategy);
+      for (const it of items) {
+        // Risk is derived from drawdown (matches Pelican), never the raw field.
+        const merged = { ...m.get(it.Id), ...it } as Strategy;
+        merged.RiskProfile = riskFromDrawdown(merged.MaxDD);
+        m.set(it.Id, merged);
+      }
       triggerRef(byIdRef);
     } catch (e) {
       handleError(e);
@@ -158,7 +164,7 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
       let added = 0;
       for (const it of items) {
         if (!m.has(it.Id)) {
-          m.set(it.Id, { ...it, _stats: false, _meta: false });
+          m.set(it.Id, { ...it, RiskProfile: riskFromDrawdown(it.MaxDD), _stats: false, _meta: false });
           newIds.push(it.Id);
           added++;
         }
@@ -259,7 +265,8 @@ function mergeMetaInto(cur: Strategy, meta: MetaResponse | null) {
   cur.Name = meta.Name ?? cur.Name;
   cur.NumCopiers = meta.NumCopiers ?? null;
   cur.Fee = meta.Fee ?? null;
-  cur.RiskProfile = meta.RiskProfile ?? null;
+  // RiskProfile is intentionally NOT taken from meta — it's derived from MaxDD
+  // (see mergeStatsInto / riskFromDrawdown) to match Pelican's classification.
   cur.IsSimulated = meta.IsSimulated ?? false;
   if (meta.IsEnabled !== undefined) cur.IsEnabled = meta.IsEnabled;
   if (meta.ImageUploaded !== undefined) cur.ImageUploaded = meta.ImageUploaded;
@@ -286,6 +293,7 @@ function mergeStatsInto(cur: Strategy, stats: StatsResponse | null) {
         ? inc.RealisedReturn * 100
         : null;
   cur.MaxDD = inc.MaxDrawdown != null ? inc.MaxDrawdown * 100 : null;
+  cur.RiskProfile = riskFromDrawdown(cur.MaxDD); // keep risk in sync with fresh drawdown
   cur.RealisedPnl = inc.RealisedPnl ?? null;
   cur.UnrealisedPnl = inc.UnrealisedPnl ?? null;
   cur.History = trimmed;

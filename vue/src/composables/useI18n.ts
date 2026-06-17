@@ -7,7 +7,7 @@ const DEFAULT_LANG: Lang = 'en';
 function readStored(): Lang | null {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v === 'en' || v === 'ru') return v;
+    if (v === 'en' || v === 'ru' || v === 'es') return v;
   } catch {
     /* storage unavailable (SSR / private mode) */
   }
@@ -55,7 +55,8 @@ export function provideI18n(initial: Lang = DEFAULT_LANG): I18nApi {
       lang.value = l;
     },
     cycleLang: () => {
-      lang.value = lang.value === 'en' ? 'ru' : 'en';
+      const order: Lang[] = ['en', 'ru', 'es'];
+      lang.value = order[(order.indexOf(lang.value) + 1) % order.length];
     },
   };
 
