@@ -30,9 +30,10 @@ in the Vue widget.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/strategies-full` | Serve `strategies-full.json.gz` from R2 (gzip passthrough, 1h edge cache). |
+| GET | `/api/strategies-full` | Serve `strategies-enabled.json` from R2 — a bare `Strategy[]` with `IsEnabled=false` rows dropped, same contract as pelican-proxy's `/api/strategies-full` (1h edge cache). Point `catalog-base` here. |
+| GET | `/api/strategies-full?raw=1` | Serve `strategies-full.json` from R2 — the raw `{ at, items }` envelope with **all** rows. Used by pelican-proxy's cold-start seed. |
 | GET | `/api/strategies-full/progress` | Serve `progress.json` (`ready: true` once first ingest succeeded). |
-| POST | `/__ingest` | Validates `X-Ingest-Secret`, stores the (gzipped) body to R2, derives `progress.json`. |
+| POST | `/__ingest` | Validates `X-Ingest-Secret`, stores the (gzipped) body to R2 as `strategies-full.json`, derives `strategies-enabled.json` and `progress.json`. |
 | GET | `/healthz` | Plain `ok`. |
 | GET | `/` | Service metadata. |
 
@@ -54,7 +55,8 @@ echo '{"at": 1700000000000, "items": [{"Id": 1, "Name": "test"}]}' \
       -H "X-Ingest-Secret: $INGEST_SECRET" \
       --data-binary @-
 
-curl -s "$WORKER_URL/api/strategies-full" | gunzip | jq '.items | length'
+curl -s "$WORKER_URL/api/strategies-full" | jq 'length'            # enabled rows only
+curl -s "$WORKER_URL/api/strategies-full?raw=1" | jq '.items | length'
 # → 1
 ```
 

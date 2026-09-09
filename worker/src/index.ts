@@ -1,7 +1,16 @@
 // Cloudflare Worker that fronts the pelican catalog R2 bucket.
 //
 // Read endpoints (cached at the edge for 1h):
-//   GET  /api/strategies-full           → strategies-full.json from R2
+//   GET  /api/strategies-full           → strategies-enabled.json from R2: a bare
+//                                         Strategy[] with IsEnabled=false rows
+//                                         dropped — the SAME contract the
+//                                         pelican-proxy exposes on that path, so
+//                                         browsers / @mashkovd/pelican-vue can point
+//                                         `catalogBase` here without a shape change.
+//   GET  /api/strategies-full?raw=1     → strategies-full.json from R2: the raw
+//                                         `{ at, items }` envelope with ALL rows.
+//                                         Used by pelican-proxy's cold-start seed,
+//                                         which needs the disabled rows too.
 //   GET  /api/strategies-full/progress  → progress.json from R2
 //
 // Write endpoint:
@@ -21,7 +30,14 @@ export interface Env {
 }
 
 const CATALOG_KEY = 'strategies-full.json';
+const ENABLED_KEY = 'strategies-enabled.json';
 const PROGRESS_KEY = 'progress.json';
+
+interface CatalogItem { IsEnabled?: boolean | null; [k: string]: unknown }
+interface CatalogEnvelope { at?: number; items?: CatalogItem[] }
+
+// Mirrors pelican-proxy's `onlyEnabled` filter on /api/strategies-full.
+const onlyEnabled = (items: CatalogItem[]) => items.filter((s) => s && s.IsEnabled !== false);
 
 const baseCors: Record<string, string> = {
   'access-control-allow-origin': '*',
@@ -38,7 +54,7 @@ export default {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/strategies-full') {
-      return serveCatalog(env);
+      return url.searchParams.get('raw') === '1' ? serveRawCatalog(env) : serveEnabledCatalog(env);
     }
     if (req.method === 'GET' && url.pathname === '/api/strategies-full/progress') {
       return serveProgress(env);
@@ -63,7 +79,7 @@ export default {
   },
 };
 
-async function serveCatalog(env: Env): Promise<Response> {
+async function serveRawCatalog(env: Env): Promise<Response> {
   const obj = await env.CATALOG.get(CATALOG_KEY);
   if (!obj) {
     return jsonResponse({ error: 'catalog not built yet' }, 503, 60);
@@ -75,6 +91,44 @@ async function serveCatalog(env: Env): Promise<Response> {
       'cache-control': 'public, max-age=3600, s-maxage=3600',
       etag: obj.httpEtag,
       'last-modified': obj.uploaded.toUTCString(),
+    },
+  });
+}
+
+async function serveEnabledCatalog(env: Env): Promise<Response> {
+  const obj = await env.CATALOG.get(ENABLED_KEY);
+  if (obj) {
+    return new Response(obj.body, {
+      headers: {
+        ...baseCors,
+        'content-type': 'application/json',
+        'cache-control': 'public, max-age=3600, s-maxage=3600',
+        etag: obj.httpEtag,
+        'last-modified': obj.uploaded.toUTCString(),
+        'x-catalog-size': obj.customMetadata?.size ?? '',
+        'x-catalog-built-at': obj.customMetadata?.builtAt ?? '',
+      },
+    });
+  }
+  // Fallback for the window between deploying this Worker and the next proxy
+  // ingest: derive the enabled array from the raw envelope on the fly so the
+  // path serves the right shape immediately. Short cache so the derived copy
+  // stops being served soon after the first real ingest lands.
+  const raw = await env.CATALOG.get(CATALOG_KEY);
+  if (!raw) {
+    return jsonResponse({ error: 'catalog not built yet' }, 503, 60);
+  }
+  const parsed = (await raw.json()) as CatalogEnvelope;
+  const items = Array.isArray(parsed.items) ? onlyEnabled(parsed.items) : [];
+  return new Response(JSON.stringify(items), {
+    headers: {
+      ...baseCors,
+      'content-type': 'application/json',
+      'cache-control': 'public, max-age=300, s-maxage=300',
+      'last-modified': raw.uploaded.toUTCString(),
+      'x-catalog-size': String(items.length),
+      'x-catalog-built-at': String(parsed.at ?? ''),
+      'x-catalog-derived': '1',
     },
   });
 }
@@ -109,11 +163,11 @@ async function ingest(req: Request, env: Env): Promise<Response> {
   // (a) extract item count for progress.json, and (b) store raw JSON on R2 so
   // the GET path doesn't double-gzip via CF's automatic egress compression.
   let json: string;
-  let parsed: { at?: number; items?: unknown[] };
+  let parsed: CatalogEnvelope;
   try {
     const ds = new DecompressionStream('gzip');
     json = await new Response(req.body.pipeThrough(ds)).text();
-    parsed = JSON.parse(json) as { at?: number; items?: unknown[] };
+    parsed = JSON.parse(json) as CatalogEnvelope;
   } catch (e) {
     return jsonResponse({ error: 'failed to parse gzipped JSON: ' + (e as Error).message }, 400);
   }
@@ -126,6 +180,12 @@ async function ingest(req: Request, env: Env): Promise<Response> {
   await env.CATALOG.put(CATALOG_KEY, json, {
     httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
   });
+  // Browser-facing copy: bare array, disabled rows dropped (pelican-proxy contract).
+  const enabled = onlyEnabled(parsed.items);
+  await env.CATALOG.put(ENABLED_KEY, JSON.stringify(enabled), {
+    httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
+    customMetadata: { size: String(enabled.length), builtAt: String(builtAt) },
+  });
   const progress = JSON.stringify({
     ready: true,
     building: false,
@@ -137,7 +197,7 @@ async function ingest(req: Request, env: Env): Promise<Response> {
     httpMetadata: { contentType: 'application/json' },
   });
 
-  return jsonResponse({ ok: true, count, built_at: builtAt, bytes: json.length });
+  return jsonResponse({ ok: true, count, enabled: enabled.length, built_at: builtAt, bytes: json.length });
 }
 
 function jsonResponse(body: unknown, status = 200, maxAge = 0): Response {
