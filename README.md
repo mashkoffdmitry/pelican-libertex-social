@@ -62,6 +62,11 @@ to an R2 bucket and serves it back). Set:
 - `CATALOG_INGEST_URL` — `https://<your-worker>.workers.dev/__ingest`
 - `CATALOG_INGEST_SECRET` — must match `INGEST_SECRET` set on the Worker
 
+Once the Worker is up, its `/api/strategies-full` is a plain public JSON URL —
+anyone can fetch it from a browser (CORS `*`) or save it as a file by adding
+`?download=1` — so a host app can ship its own static frontend over the catalog
+without touching this proxy.
+
 When unset, the upload step is skipped silently and the proxy keeps serving
 `/api/strategies-full` directly. When set, the built-in demo page also points the
 Vue widget's `catalog-base` at the Worker origin, so browsers fetch the catalog
