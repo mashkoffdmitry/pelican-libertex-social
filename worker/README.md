@@ -32,7 +32,7 @@ in the Vue widget.
 |---|---|---|
 | GET | `/api/strategies-full` | Serve `strategies-enabled.json` from R2 — a bare `Strategy[]` with `IsEnabled=false` rows dropped, same contract as pelican-proxy's `/api/strategies-full` (1h edge cache). Point `catalog-base` here. |
 | GET | `/api/strategies-full?raw=1` | Serve `strategies-full.json` from R2 — the raw `{ at, items }` envelope with **all** rows. Used by pelican-proxy's cold-start seed. |
-| GET | `/api/strategies-full/progress` | Serve `progress.json` (`ready: true` once first ingest succeeded). |
+| GET | `/api/strategies-full/progress` | Serve `progress.json` (`ready: true` once first ingest succeeded; `loaded`/`total` = enabled row count, matching what `/api/strategies-full` returns). |
 | POST | `/__ingest` | Validates `X-Ingest-Secret`, stores the (gzipped) body to R2 as `strategies-full.json`, derives `strategies-enabled.json` and `progress.json`. |
 | GET | `/healthz` | Plain `ok`. |
 | GET | `/` | Service metadata. |
