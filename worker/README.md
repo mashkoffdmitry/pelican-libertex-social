@@ -4,6 +4,14 @@ Cloudflare Worker that fronts the `pelican-catalog` R2 bucket. Reads serve the
 freshly-built strategies catalog with edge cache; the `/__ingest` endpoint
 accepts gzipped-JSON pushes from the pelican-proxy after every rebuild.
 
+## Deploying
+
+CI does it: every push to `main` that touches `worker/**` runs the `deploy-worker`
+job, which needs the `CLOUDFLARE_API_TOKEN` repo secret (an "Edit Cloudflare
+Workers" token) and optionally `CLOUDFLARE_ACCOUNT_ID`. Without the secret the job
+warns and skips. `npx wrangler deploy` from this directory remains the manual
+fallback.
+
 ## One-time setup
 
 ```bash
