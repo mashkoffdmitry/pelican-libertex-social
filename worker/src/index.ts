@@ -78,6 +78,12 @@ const baseCors: Record<string, string> = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
   'access-control-allow-headers': 'content-type, x-ingest-secret, content-encoding',
+  // Without this, a cross-origin page can only read the CORS-safelisted response
+  // headers (cache-control, content-type, last-modified, ...) — so an embedder
+  // fetching the catalog from its own site got `null` for every x-catalog-* header
+  // and had no way to tell how fresh the data was without parsing the body.
+  'access-control-expose-headers':
+    'x-catalog-size, x-catalog-built-at, x-catalog-derived, etag',
 };
 
 export default {

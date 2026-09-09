@@ -34,6 +34,11 @@ npx wrangler deploy
 `CATALOG_INGEST_URL` (with `/__ingest` suffix) and as the `catalog-base` prop
 in the Vue widget.
 
+All responses send `access-control-allow-origin: *` and expose `x-catalog-size`,
+`x-catalog-built-at`, `x-catalog-derived` and `etag` via
+`access-control-expose-headers`, so a page on another origin can read catalog
+freshness without parsing the body.
+
 ## Endpoints
 
 | Method | Path | Purpose |
