@@ -108,6 +108,12 @@ Full props/emits/slots reference and CORS workarounds (Vite/Nuxt/Quasar dev-serv
 | `GET /api/strategies/{id}/stats` | Performance + trade history |
 | `GET /api/strategies/{id}/signals/{open\|closed}` | Open / 30-day-closed trades |
 
+Individual trades are **not** in `/api/strategies-full` — the catalog carries
+per-strategy aggregates (`TradesTotal`, `Wins`, `Losses`, `Markets`, `History`)
+and nothing per-trade. Open and closed positions come from the `signals`
+endpoints above, live through the proxy. See [ROADMAP.md](ROADMAP.md) for why,
+and for the options if you need them pre-baked.
+
 ## Development
 
 ```bash
