@@ -147,6 +147,118 @@ jobs:
         run: |
           echo "📦 Published @mashkovd/pelican-vue@${{ steps.check.outputs.version }} to npm" >> "$GITHUB_STEP_SUMMARY"
 
+  deploy-worker:
+    name: deploy pelican-catalog-worker to Cloudflare
+    # The Worker is the read path for the catalog (R2 -> edge). Before this job
+    # existed it was deployed by hand, so `main` could carry Worker source that
+    # was never live. Gated on the type-check, and skipped silently when the
+    # Cloudflare token isn't configured (forks, contributors).
+    needs: [worker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - name: Skip if CLOUDFLARE_API_TOKEN unset
+        id: gate
+        working-directory: .
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN secret not set — skipping Worker deploy"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Detect worker/ changes
+        id: changed
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          # Branch creation pushes a zero SHA, and a force-push can leave a
+          # before-SHA this clone doesn't have. Either way we can't diff, so
+          # deploy rather than risk leaving the edge behind `main`.
+          if [ -z "$BEFORE" ] \
+             || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "::notice::No usable before-SHA — deploying anyway"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BEFORE" "${{ github.sha }}" | grep -q '^worker/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No worker/ changes in this push — nothing to deploy"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true' && steps.changed.outputs.run == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - run: npm ci
+        if: steps.gate.outputs.skip != 'true' && steps.changed.outputs.run == 'true'
+
+      - name: Deploy Worker
+        id: deploy
+        if: steps.gate.outputs.skip != 'true' && steps.changed.outputs.run == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler deploy 2>&1 | tee deploy.log
+          VERSION=$(grep -oE 'Current Version ID: [0-9a-f-]+' deploy.log | awk '{print $4}' || true)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the deployed Worker serves the catalog
+        if: steps.gate.outputs.skip != 'true' && steps.changed.outputs.run == 'true'
+        working-directory: .
+        run: |
+          set -euo pipefail
+          URL=https://pelican-catalog-worker.pelican-libertex.workers.dev
+          curl -fsS "$URL/healthz" > /dev/null
+          # Write to a file rather than piping into head: curl exits 56 when the
+          # reader closes the pipe early, and `pipefail` would fail the step on
+          # a perfectly good response.
+          curl -fsS --compressed "$URL/api/strategies-full" -o /tmp/catalog.json
+          # A bare array (the pelican-proxy contract) is what browsers and the
+          # Vue widget expect here; an object would mean the raw envelope leaked
+          # onto the browser-facing path.
+          node -e '
+            const c = require("fs").readFileSync("/tmp/catalog.json", "utf8");
+            const d = JSON.parse(c);
+            if (!Array.isArray(d)) throw new Error("/api/strategies-full is not a JSON array");
+            if (d.length === 0) throw new Error("/api/strategies-full is empty");
+            if (d.some((s) => s && s.IsEnabled === false)) throw new Error("disabled rows leaked into the enabled catalog");
+            console.log(`OK — ${d.length} enabled strategies`);
+          '
+
+      - name: Summary
+        if: steps.gate.outputs.skip != 'true' && steps.changed.outputs.run == 'true'
+        working-directory: .
+        run: |
+          {
+            echo "## Cloudflare Worker deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| script | \`pelican-catalog-worker\` |"
+            echo "| version | \`${{ steps.deploy.outputs.version }}\` |"
+            echo "| commit | \`${{ github.sha }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: deploy to mctl labs/pelican-proxy
     # Only depends on the jobs that actually run on push to main. The docker

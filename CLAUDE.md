@@ -24,9 +24,9 @@ artifacts:
 | `start.sh` | Supervises `server.js` + `refresher.js`. **busybox-compatible** — `wait -n` doesn't exist on Alpine, uses `kill -0` poll loop instead. |
 | `Dockerfile` | `node:22.11-alpine3.20` pinned, tini, non-root user `app`, HEALTHCHECK on `/healthz`. |
 | `vue/` | Vue 3 SFC + Vite library mode → `@mashkovd/pelican-vue` on npmjs. Decoupled SemVer from the proxy. |
-| `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deploy: `cd worker && npx wrangler deploy`. |
+| `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deployed by CI on push to `main` when `worker/**` changed (job `deploy-worker`, secret `CLOUDFLARE_API_TOKEN`); manual fallback `cd worker && npx wrangler deploy`. |
 | `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
-| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` (always), `docker` (PR-only gate), `deploy` (push-to-main only). |
+| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy` and `deploy-worker` (push-to-main only). |
 | `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. Optionally `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` for Worker push. |
 
 ## Production
@@ -124,6 +124,13 @@ procedure.
 ## Cloudflare Worker (catalog edge)
 
 Optional layer that fronts the catalog from R2 — see [`worker/README.md`](worker/README.md).
+
+CI deploys it on every push to `main` that touches `worker/**` (job `deploy-worker`,
+gated on the `CLOUDFLARE_API_TOKEN` Actions secret — an "Edit Cloudflare Workers"
+token; add `CLOUDFLARE_ACCOUNT_ID` too if the token can see more than one account).
+Unset secret → the job warns and skips, so forks still pass CI. The job re-checks
+the live `/api/strategies-full` afterwards and fails if it isn't a non-empty array
+of enabled-only rows.
 
 One-time setup:
 ```bash
