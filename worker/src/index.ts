@@ -11,6 +11,9 @@
 //                                         `{ at, items }` envelope with ALL rows.
 //                                         Used by pelican-proxy's cold-start seed,
 //                                         which needs the disabled rows too.
+//   GET  /api/strategies-full?download=1 → same body, plus Content-Disposition so a
+//                                         browser saves it as a file instead of
+//                                         rendering it. Combinable with raw=1.
 //   GET  /api/strategies-full/progress  → progress.json from R2
 //
 // Write endpoint:
@@ -60,6 +63,17 @@ async function storeEnabled(env: Env, enabled: CatalogItem[], builtAt: number): 
   });
 }
 
+// Content-Disposition for `?download=1`, so a plain browser link saves the
+// catalog as a file instead of rendering 3.4 MB of JSON in a tab. The date comes
+// from the catalog's own build timestamp, so two downloads of the same build get
+// the same filename. Kept ASCII-only — no user input reaches this value.
+function downloadHeaders(builtAt: number | null, raw: boolean): Record<string, string> {
+  const ts = builtAt && Number.isFinite(builtAt) ? new Date(builtAt) : new Date();
+  const day = ts.toISOString().slice(0, 10);
+  const name = `libertex-strategies${raw ? '-full' : ''}-${day}.json`;
+  return { 'content-disposition': `attachment; filename="${name}"` };
+}
+
 const baseCors: Record<string, string> = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
@@ -75,7 +89,10 @@ export default {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/strategies-full') {
-      return url.searchParams.get('raw') === '1' ? serveRawCatalog(env) : serveEnabledCatalog(env);
+      const download = url.searchParams.get('download') === '1';
+      return url.searchParams.get('raw') === '1'
+        ? serveRawCatalog(env, download)
+        : serveEnabledCatalog(env, download);
     }
     if (req.method === 'GET' && url.pathname === '/api/strategies-full/progress') {
       return serveProgress(env);
@@ -100,11 +117,12 @@ export default {
   },
 };
 
-async function serveRawCatalog(env: Env): Promise<Response> {
+async function serveRawCatalog(env: Env, download = false): Promise<Response> {
   const obj = await env.CATALOG.get(CATALOG_KEY);
   if (!obj) {
     return jsonResponse({ error: 'catalog not built yet' }, 503, 60);
   }
+  const builtAt = Number(obj.customMetadata?.builtAt) || obj.uploaded.getTime();
   return new Response(obj.body, {
     headers: {
       ...baseCors,
@@ -112,11 +130,12 @@ async function serveRawCatalog(env: Env): Promise<Response> {
       'cache-control': 'public, max-age=3600, s-maxage=3600',
       etag: obj.httpEtag,
       'last-modified': obj.uploaded.toUTCString(),
+      ...(download ? downloadHeaders(builtAt, true) : {}),
     },
   });
 }
 
-async function serveEnabledCatalog(env: Env): Promise<Response> {
+async function serveEnabledCatalog(env: Env, download = false): Promise<Response> {
   const obj = await env.CATALOG.get(ENABLED_KEY);
   if (obj) {
     return new Response(obj.body, {
@@ -128,6 +147,9 @@ async function serveEnabledCatalog(env: Env): Promise<Response> {
         'last-modified': obj.uploaded.toUTCString(),
         'x-catalog-size': obj.customMetadata?.size ?? '',
         'x-catalog-built-at': obj.customMetadata?.builtAt ?? '',
+        ...(download
+          ? downloadHeaders(Number(obj.customMetadata?.builtAt) || obj.uploaded.getTime(), false)
+          : {}),
       },
     });
   }
@@ -154,6 +176,7 @@ async function serveEnabledCatalog(env: Env): Promise<Response> {
       'x-catalog-size': String(items.length),
       'x-catalog-built-at': String(parsed.at ?? ''),
       'x-catalog-derived': '1',
+      ...(download ? downloadHeaders(builtAt, false) : {}),
     },
   });
 }
@@ -204,6 +227,8 @@ async function ingest(req: Request, env: Env): Promise<Response> {
 
   await env.CATALOG.put(CATALOG_KEY, json, {
     httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
+    // builtAt so ?download=1 can name the file after the build, not the upload.
+    customMetadata: { size: String(count), builtAt: String(builtAt) },
   });
   // Browser-facing copy (bare array, disabled rows dropped) + progress.json.
   const enabled = onlyEnabled(parsed.items);
