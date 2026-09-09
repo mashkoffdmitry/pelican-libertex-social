@@ -39,6 +39,27 @@ interface CatalogEnvelope { at?: number; items?: CatalogItem[] }
 // Mirrors pelican-proxy's `onlyEnabled` filter on /api/strategies-full.
 const onlyEnabled = (items: CatalogItem[]) => items.filter((s) => s && s.IsEnabled !== false);
 
+// Persist the browser-facing copy + progress.json. `loaded`/`total` are the
+// ENABLED count — that's what the widget shows in "Showing N of TOTAL" and
+// what /api/strategies-full actually returns; the raw envelope's row count
+// (incl. disabled) is an internal detail of the proxy's rebuild.
+async function storeEnabled(env: Env, enabled: CatalogItem[], builtAt: number): Promise<void> {
+  await env.CATALOG.put(ENABLED_KEY, JSON.stringify(enabled), {
+    httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
+    customMetadata: { size: String(enabled.length), builtAt: String(builtAt) },
+  });
+  const progress = JSON.stringify({
+    ready: true,
+    building: false,
+    loaded: enabled.length,
+    total: enabled.length,
+    built_at: builtAt,
+  });
+  await env.CATALOG.put(PROGRESS_KEY, progress, {
+    httpMetadata: { contentType: 'application/json' },
+  });
+}
+
 const baseCors: Record<string, string> = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
@@ -120,6 +141,10 @@ async function serveEnabledCatalog(env: Env): Promise<Response> {
   }
   const parsed = (await raw.json()) as CatalogEnvelope;
   const items = Array.isArray(parsed.items) ? onlyEnabled(parsed.items) : [];
+  // Self-heal: persist what we derived so the next request (and /progress)
+  // read the stored copy instead of re-parsing the raw envelope every time.
+  const builtAt = typeof parsed.at === 'number' ? parsed.at : Date.now();
+  await storeEnabled(env, items, builtAt);
   return new Response(JSON.stringify(items), {
     headers: {
       ...baseCors,
@@ -180,22 +205,9 @@ async function ingest(req: Request, env: Env): Promise<Response> {
   await env.CATALOG.put(CATALOG_KEY, json, {
     httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
   });
-  // Browser-facing copy: bare array, disabled rows dropped (pelican-proxy contract).
+  // Browser-facing copy (bare array, disabled rows dropped) + progress.json.
   const enabled = onlyEnabled(parsed.items);
-  await env.CATALOG.put(ENABLED_KEY, JSON.stringify(enabled), {
-    httpMetadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
-    customMetadata: { size: String(enabled.length), builtAt: String(builtAt) },
-  });
-  const progress = JSON.stringify({
-    ready: true,
-    building: false,
-    loaded: count,
-    total: count,
-    built_at: builtAt,
-  });
-  await env.CATALOG.put(PROGRESS_KEY, progress, {
-    httpMetadata: { contentType: 'application/json' },
-  });
+  await storeEnabled(env, enabled, builtAt);
 
   return jsonResponse({ ok: true, count, enabled: enabled.length, built_at: builtAt, bytes: json.length });
 }
