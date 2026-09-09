@@ -7,8 +7,11 @@ accepts gzipped-JSON pushes from the pelican-proxy after every rebuild.
 ## Deploying
 
 CI does it: every push to `main` that touches `worker/**` runs the `deploy-worker`
-job. It needs two repo secrets — `CLOUDFLARE_API_TOKEN` (an "Edit Cloudflare
-Workers" token) and `CLOUDFLARE_ACCOUNT_ID`. The account id is **required** for an
+job. Markdown is excluded from that filter, so editing this README alone doesn't
+redeploy the script.
+
+It needs two repo secrets — `CLOUDFLARE_API_TOKEN` (an "Edit Cloudflare Workers"
+token) and `CLOUDFLARE_ACCOUNT_ID`. The account id is **required** for an
 account-scoped token: without it wrangler tries the user-scoped `/memberships`
 endpoint and fails with `Authentication failed (status: 400) [code: 9106]`, which
 looks like a bad token but isn't. Without `CLOUDFLARE_API_TOKEN` the job warns and
