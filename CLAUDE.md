@@ -125,10 +125,18 @@ procedure.
 
 Optional layer that fronts the catalog from R2 — see [`worker/README.md`](worker/README.md).
 
-CI deploys it on every push to `main` that touches `worker/**` (job `deploy-worker`,
-gated on the `CLOUDFLARE_API_TOKEN` Actions secret — an "Edit Cloudflare Workers"
-token; add `CLOUDFLARE_ACCOUNT_ID` too if the token can see more than one account).
-Unset secret → the job warns and skips, so forks still pass CI. The job re-checks
+CI deploys it on every push to `main` that touches `worker/**` (job `deploy-worker`).
+It needs **both** Actions secrets:
+
+- `CLOUDFLARE_API_TOKEN` — an "Edit Cloudflare Workers" token (the zone policy from
+  that template is unnecessary here; the Worker has no zone routes).
+- `CLOUDFLARE_ACCOUNT_ID` — **required, not optional**, whenever the token is
+  *account-scoped*. Wrangler otherwise calls the user-scoped `/memberships`
+  endpoint to discover the account and dies with
+  `Authentication failed (status: 400) [code: 9106]`, which reads like a bad token
+  but is really a missing account id.
+
+Unset `CLOUDFLARE_API_TOKEN` → the job warns and skips, so forks still pass CI. The job re-checks
 the live `/api/strategies-full` afterwards and fails if it isn't a non-empty array
 of enabled-only rows.
 
