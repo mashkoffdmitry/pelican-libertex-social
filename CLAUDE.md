@@ -146,7 +146,10 @@ and serves it from the edge with 1h cache.
 
 In the Vue widget, pass `catalog-base="<worker-url>"` alongside `api-base`
 to fetch the catalog from the edge while live data still goes through the
-proxy.
+proxy. `server.js` does this for its own demo page: `CATALOG_BASE` is derived
+from `CATALOG_INGEST_URL`'s origin. The Worker's `GET /api/strategies-full`
+returns the same enabled-only `Strategy[]` as the proxy; `?raw=1` returns the
+`{ at, items }` envelope with all rows, which `seedFromR2()` uses.
 
 ## External resources
 

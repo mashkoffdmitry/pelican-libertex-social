@@ -63,7 +63,9 @@ to an R2 bucket and serves it back). Set:
 - `CATALOG_INGEST_SECRET` — must match `INGEST_SECRET` set on the Worker
 
 When unset, the upload step is skipped silently and the proxy keeps serving
-`/api/strategies-full` directly. See [`worker/README.md`](worker/README.md)
+`/api/strategies-full` directly. When set, the built-in demo page also points the
+Vue widget's `catalog-base` at the Worker origin, so browsers fetch the catalog
+from the edge and only live per-strategy calls hit this proxy. See [`worker/README.md`](worker/README.md)
 for one-time Worker deploy instructions.
 
 ## Use the Vue component

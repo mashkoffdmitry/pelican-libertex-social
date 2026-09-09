@@ -7,6 +7,14 @@ const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
 const PKG_VERSION = '0.4.7';
+// Demo page reads the static catalog from the Cloudflare Worker (edge, R2) when
+// one is configured, and keeps live per-strategy calls on this proxy. Derived
+// from CATALOG_INGEST_URL so no extra env var is needed; unset → legacy
+// single-origin behaviour (catalog served by this process).
+const CATALOG_BASE = (() => {
+  try { return process.env.CATALOG_INGEST_URL ? new URL(process.env.CATALOG_INGEST_URL).origin : ''; }
+  catch { return ''; }
+})();
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,7 +34,7 @@ const INDEX_HTML = `<!DOCTYPE html>
   <script>
     const { createApp, h } = Vue;
     const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
-    createApp({ render: () => h(PelicanComponent, { apiBase: '' }) }).mount('#app');
+    createApp({ render: () => h(PelicanComponent, { apiBase: '', catalogBase: ${JSON.stringify(CATALOG_BASE)} }) }).mount('#app');
   </script>
 </body>
 </html>`;
@@ -243,9 +251,14 @@ async function seedFromR2() {
   if (!ingestUrl) return false;
   try {
     const base = new URL(ingestUrl).origin;
-    const r = await fetch(`${base}/api/strategies-full`, { signal: AbortSignal.timeout(15000) });
+    // ?raw=1 → the full `{ at, items }` envelope incl. disabled rows (needed for
+    // the knownDisabled skip in buildFull). Plain /api/strategies-full on the
+    // Worker is the browser-facing enabled-only array; tolerate that shape too
+    // so Worker/proxy deploy order doesn't matter.
+    const r = await fetch(`${base}/api/strategies-full?raw=1`, { signal: AbortSignal.timeout(15000) });
     if (!r.ok) { console.log(`[r2] seed skipped: HTTP ${r.status}`); return false; }
-    const j = await r.json();
+    const body = await r.json();
+    const j = Array.isArray(body) ? { at: Date.now(), items: body } : body;
     if (!Array.isArray(j.items) || j.items.length === 0) { console.log('[r2] seed skipped: empty catalog in R2'); return false; }
     const ageH = ((Date.now() - (j.at || 0)) / 3600000).toFixed(1);
     fullCache = { at: j.at || Date.now(), items: j.items, partial: null, building: null, progress: { loaded: j.items.length, total: j.items.length } };
