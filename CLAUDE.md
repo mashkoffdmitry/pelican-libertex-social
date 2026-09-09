@@ -167,6 +167,14 @@ from `CATALOG_INGEST_URL`'s origin. The Worker's `GET /api/strategies-full`
 returns the same enabled-only `Strategy[]` as the proxy; `?raw=1` returns the
 `{ at, items }` envelope with all rows, which `seedFromR2()` uses.
 
+## Open decisions
+
+[`ROADMAP.md`](ROADMAP.md) records design questions left deliberately unresolved,
+with the numbers behind each trade-off. Currently one: individual trades are not
+in the catalog (aggregates only) and adding them would roughly triple the 6-hourly
+rebuild against a single shared Libertex account. Read it before proposing to bake
+per-trade data into `/api/strategies-full`.
+
 ## External resources
 
 - Source: https://github.com/mashkoffdmitry/pelican-libertex-social
