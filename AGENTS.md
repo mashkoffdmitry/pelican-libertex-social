@@ -1,6 +1,6 @@
-# Pelican — orientation for Claude
+# Pelican — orientation for Codex
 
-This file is auto-loaded by Claude Code in this project. It captures
+This file is auto-loaded by Codex in this project. It captures
 the non-obvious facts you would otherwise spend a session re-discovering.
 
 ## What this is
@@ -24,9 +24,9 @@ artifacts:
 | `start.sh` | Supervises `server.js` + `refresher.js`. **busybox-compatible** — `wait -n` doesn't exist on Alpine, uses `kill -0` poll loop instead. |
 | `Dockerfile` | `node:22.11-alpine3.20` pinned, tini, non-root user `app`, HEALTHCHECK on `/healthz`. |
 | `vue/` | Vue 3 SFC + Vite library mode → `@mashkovd/pelican-vue` on npmjs. Decoupled SemVer from the proxy. |
-| `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deployed by CI on push to `main` when `worker/**` changed, markdown excluded (job `deploy-worker`, secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`); manual fallback `cd worker && npx wrangler deploy`. |
+| `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deploy: `cd worker && npx wrangler deploy`. |
 | `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
-| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy` and `deploy-worker` (push-to-main only). |
+| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` (always), `docker` (PR-only gate), `deploy` (push-to-main only). |
 | `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. Optionally `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` for Worker push. |
 
 ## Production
@@ -116,7 +116,7 @@ enabled, otherwise `npm publish` 403s on accounts with 2FA.
 - **Stuck workflow rollback race:** if a `deploy-service` workflow sits
   Pending (e.g. behind tenant quota) and is admitted hours later, its
   `commit` step can rewrite gitops with a stale image tag — overwriting
-  a newer deploy. See `~/.claude/projects/.../memory/stuck_workflow_rollback.md`
+  a newer deploy. See `~/.Codex/projects/.../memory/stuck_workflow_rollback.md`
   for the incident write-up. Mitigation: don't unblock old Pending
   workflows once newer ones have shipped.
 - **labs CPU quota:** four baseline service pods sit at ~5100m used.
@@ -141,28 +141,12 @@ plumbing) are the canonical mctl onboarding patterns. They're now
 documented at https://docs.mctl.ai/guides/scaffolding with copy-paste
 templates for Node / Python / Go / static. The `mctl_deploy_service` and
 `mctl_grant_repo_access` MCP tool descriptions point at the same URL,
-so a fresh Claude session reading the tools should already know the
+so a fresh Codex session reading the tools should already know the
 procedure.
 
 ## Cloudflare Worker (catalog edge)
 
 Optional layer that fronts the catalog from R2 — see [`worker/README.md`](worker/README.md).
-
-CI deploys it on every push to `main` that touches `worker/**`, markdown excluded
-(job `deploy-worker`) — a README-only edit doesn't cut a new Worker version.
-It needs **both** Actions secrets:
-
-- `CLOUDFLARE_API_TOKEN` — an "Edit Cloudflare Workers" token (the zone policy from
-  that template is unnecessary here; the Worker has no zone routes).
-- `CLOUDFLARE_ACCOUNT_ID` — **required, not optional**, whenever the token is
-  *account-scoped*. Wrangler otherwise calls the user-scoped `/memberships`
-  endpoint to discover the account and dies with
-  `Authentication failed (status: 400) [code: 9106]`, which reads like a bad token
-  but is really a missing account id.
-
-Unset `CLOUDFLARE_API_TOKEN` → the job warns and skips, so forks still pass CI. The job re-checks
-the live `/api/strategies-full` afterwards and fails if it isn't a non-empty array
-of enabled-only rows.
 
 One-time setup:
 ```bash
@@ -185,18 +169,7 @@ and serves it from the edge with 1h cache.
 
 In the Vue widget, pass `catalog-base="<worker-url>"` alongside `api-base`
 to fetch the catalog from the edge while live data still goes through the
-proxy. `server.js` does this for its own demo page: `CATALOG_BASE` is derived
-from `CATALOG_INGEST_URL`'s origin. The Worker's `GET /api/strategies-full`
-returns the same enabled-only `Strategy[]` as the proxy; `?raw=1` returns the
-`{ at, items }` envelope with all rows, which `seedFromR2()` uses.
-
-## Open decisions
-
-[`ROADMAP.md`](ROADMAP.md) records design questions left deliberately unresolved,
-with the numbers behind each trade-off. Currently one: individual trades are not
-in the catalog (aggregates only) and adding them would roughly triple the 6-hourly
-rebuild against a single shared Libertex account. Read it before proposing to bake
-per-trade data into `/api/strategies-full`.
+proxy.
 
 ## External resources
 
