@@ -4,9 +4,13 @@
   "description": "Self-hosted Libertex Social copy-trading viewer (autonomous OIDC proxy + static frontend + Vue 3 component).",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "refresher": "node refresher.js"
+    "refresher": "node refresher.js",
+    "check:syntax": "node --check server.js refresher.js oidc-client.js r2-uploader.js",
+    "check:vue": "npm --prefix vue run type-check && npm --prefix vue run build",
+    "check:worker": "node worker/node_modules/typescript/bin/tsc -p worker/tsconfig.json --noEmit",
+    "check": "npm run check:syntax && npm run check:vue && npm run check:worker",
+    "test": "npm run check"
   },
   "engines": {
     "node": ">=22"

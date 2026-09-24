@@ -36,27 +36,94 @@ artifacts:
 - **GitOps manifest:** `mctlhq/mctl-gitops` → `platform-gitops/services/labs/pelican-proxy/values.yaml`
 - **Image registry:** `ghcr.io/mctlhq/pelican-proxy:<git-tag>` (built by mctl, not by GH Actions)
 
-## Staging (Colleague environment — Вариант 2)
+## Local development & testing
+
+Before pushing to `staging` or `main`, verify changes locally.
+
+### 1. Environment setup
+Copy `.env.example` to `.env` and fill Libertex account credentials:
+```bash
+cp .env.example .env
+# Edit .env with your LIBERTEX_EMAIL and LIBERTEX_PASSWORD
+```
+
+### 2. Run the proxy locally
+- **Option A (All-in-one with supervisor):**
+  ```bash
+  ./start.sh
+  ```
+  Runs `refresher.js` (OIDC auth loop) and `server.js` (proxy on port 8787).
+- **Option B (Separate terminals):**
+  ```bash
+  # Terminal 1: Token refresher (OIDC walk against Libertex IdP)
+  npm run refresher
+
+  # Terminal 2: API proxy
+  npm start
+  ```
+- **Verify local proxy:**
+  ```bash
+  curl http://localhost:8787/healthz        # Expected: {"ok":true}
+  curl http://localhost:8787/__status       # Check token status & TTL
+  curl http://localhost:8787/api/discover   # Test live upstream Libertex proxy
+  curl http://localhost:8787/api/strategies/2014074
+  ```
+
+### 3. Run the Vue 3 frontend locally
+```bash
+cd vue
+npm install
+npm run dev
+```
+Open `http://localhost:5173`. By default, Vite proxies requests to `http://localhost:8787` (or configure `api-base` to `https://labs-pelican-proxy-staging.mctl.ai`).
+
+### 4. Pre-push verification (run before pushing)
+Emulates CI checks to ensure your PR will pass:
+```bash
+# Run all pre-push checks at once:
+npm test
+
+# Or run individual checks:
+npm run check:syntax   # Node.js backend syntax
+npm run check:vue      # Vue library type-check & build
+npm run check:worker   # Cloudflare Worker type-check
+```
+
+## Staging & Collaboration Flow (Вариант 2)
 
 A parallel, isolated proxy instance running alongside production for team collaboration and feature testing:
 
-- **Branch:** `staging` (colleagues can push directly or open PRs into `staging`)
+- **Branch:** `staging`
 - **URL:** https://labs-pelican-proxy-staging.mctl.ai
+- **Status:** https://labs-pelican-proxy-staging.mctl.ai/__status
 - **mctl:** team `labs`, service `pelican-proxy-staging`
 - **GitOps manifest:** `mctlhq/mctl-gitops` → `platform-gitops/services/labs/pelican-proxy-staging/values.yaml`
-- **R2 catalog safety:**
-  - Reads the production catalog on cold start (`seedFromR2()` via `CATALOG_INGEST_URL=https://pelican-catalog-worker.pelican-libertex.workers.dev/__ingest`), ensuring immediate readiness (~2s) without a cold build.
-  - `CATALOG_INGEST_SECRET` is intentionally **omitted** so staging background rebuilds never overwrite the production R2 catalog.
-- **Libertex API & caching:**
-  - Staging uses its own Vault secret (`teams/labs/pelican-proxy-staging-secrets`) populated from `teams/labs/pelican-proxy`.
-  - In-memory cache protects the shared account from upstream rate limits during testing.
-- **Deploy:**
-  - Automatic: push to `staging` branch triggers CI deploy to `pelican-proxy-staging` via mctl.
-  - Manual via MCP:
-    ```
-    mctl_deploy_service action=deploy team_name=labs component_name=pelican-proxy-staging \
-      git_tag=staging-X.Y.Z dockerfile_repo=mashkoffdmitry/pelican-libertex-social
-    ```
+- **Image registry:** `ghcr.io/mctlhq/pelican-proxy-staging:<git-tag>`
+
+### Colleague collaboration workflow:
+1. Branch from `staging`:
+   ```bash
+   git checkout staging && git pull origin staging
+   git checkout -b feat/your-feature
+   ```
+2. Make changes, run local checks (`node --check`, Vue type-check, etc.).
+3. Commit and push:
+   ```bash
+   git push -u origin feat/your-feature
+   ```
+4. Open a Pull Request targeting branch **`staging`** (NOT `main`).
+5. Once merged into `staging`:
+   - GitHub Actions (`deploy-staging`) triggers automatically.
+   - Tags commit as `staging-<run_number>`.
+   - Calls mctl `deploy-service`, builds image in GHCR, updates GitOps, and syncs ArgoCD.
+   - **~3-4 minutes to live** on `https://labs-pelican-proxy-staging.mctl.ai`.
+   - No manual deploy commands or cluster credentials required!
+6. When fully tested on staging, open a PR from `staging` into `main` for production release.
+
+### R2 catalog safety:
+- Staging reads the production catalog on cold start (`seedFromR2()` via `CATALOG_INGEST_URL=https://pelican-catalog-worker.pelican-libertex.workers.dev/__ingest`), ensuring immediate readiness (~2s) without a cold build.
+- `CATALOG_INGEST_SECRET` is intentionally **omitted** from staging secrets, so background catalog rebuilds NEVER overwrite the production R2 catalog.
+- In-memory cache protects the Libertex API account from upstream rate limits during testing.
 
 
 ## Deploy flow (CD)
