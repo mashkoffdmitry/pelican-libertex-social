@@ -627,6 +627,25 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+// In-memory cache for live /api/* responses to prevent upstream rate-limiting
+const apiCache = new Map(); // url -> { status, headers, body, expiresAt }
+const apiInflight = new Map(); // url -> Promise<{ status, headers, body }>
+
+function getApiCacheTtlMs(pathname) {
+  if (pathname.includes('/signals/')) return 15 * 1000;   // 15s for signals
+  if (pathname.endsWith('/stats')) return 60 * 1000;      // 60s for stats
+  if (/^\/api\/strategies\/\d+\/?$/.test(pathname)) return 120 * 1000; // 2 min for strategy info
+  if (pathname.startsWith('/api/discover')) return 300 * 1000; // 5 min for discover
+  return 30 * 1000; // 30s default
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of apiCache) {
+    if (now >= entry.expiresAt) apiCache.delete(key);
+  }
+}, 60_000).unref();
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,OPTIONS',
@@ -735,6 +754,7 @@ const server = http.createServer((req, res) => {
       expires_at: exp || null,
       seconds_left: exp ? exp - now : null,
       expired: exp ? now >= exp : null,
+      api_cache_entries: apiCache.size,
     }));
   }
 
@@ -832,31 +852,84 @@ const server = http.createServer((req, res) => {
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
       return res.end(JSON.stringify({ error: 'rate_limited', limit: RATE_LIMIT + '/min' }));
     }
+
+    const cacheKey = req.url;
+    const now = Date.now();
+    const cached = apiCache.get(cacheKey);
+    if (cached && now < cached.expiresAt) {
+      sendCompressed(req, res, cached.body, cached.status, {
+        ...cached.headers,
+        'X-Cache': 'HIT',
+      });
+      return;
+    }
+    if (cached && now >= cached.expiresAt) {
+      apiCache.delete(cacheKey);
+    }
+
     const env = readEnv();
     if (!env.ACCESS_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: 'no_token', hint: 'host needs to provide token' }));
     }
-    const opts = {
-      method: 'GET', hostname: UPSTREAM_HOST, path: req.url,
-      headers: {
-        'Authorization': 'Bearer ' + env.ACCESS_TOKEN,
-        'Accept': 'application/json',
-        'User-Agent': 'pelican-proxy/0.2',
-      },
-    };
-    const upstreamReq = https.request(opts, upstreamRes => {
-      const headers = { ...upstreamRes.headers };
-      delete headers['transfer-encoding'];
-      headers['Access-Control-Allow-Origin'] = '*';
-      res.writeHead(upstreamRes.statusCode, headers);
-      upstreamRes.pipe(res);
-    });
-    upstreamReq.on('error', e => {
+
+    let fetchPromise = apiInflight.get(cacheKey);
+    if (!fetchPromise) {
+      fetchPromise = new Promise((resolve, reject) => {
+        const opts = {
+          method: 'GET', hostname: UPSTREAM_HOST, path: req.url,
+          headers: {
+            'Authorization': 'Bearer ' + env.ACCESS_TOKEN,
+            'Accept': 'application/json',
+            'User-Agent': 'pelican-proxy/0.3',
+          },
+        };
+        const upstreamReq = https.request(opts, upstreamRes => {
+          const chunks = [];
+          upstreamRes.on('data', chunk => chunks.push(chunk));
+          upstreamRes.on('end', () => {
+            const body = Buffer.concat(chunks);
+            const headers = { ...upstreamRes.headers };
+            delete headers['transfer-encoding'];
+            delete headers['content-encoding'];
+            delete headers['content-length'];
+            headers['Access-Control-Allow-Origin'] = '*';
+            const status = upstreamRes.statusCode || 200;
+            if (status === 200) {
+              apiCache.set(cacheKey, {
+                status,
+                headers,
+                body,
+                expiresAt: Date.now() + getApiCacheTtlMs(u.pathname),
+              });
+            } else if (status === 404) {
+              apiCache.set(cacheKey, {
+                status,
+                headers,
+                body,
+                expiresAt: Date.now() + 15_000,
+              });
+            }
+            resolve({ status, headers, body });
+          });
+        });
+        upstreamReq.on('error', reject);
+        upstreamReq.end();
+      }).finally(() => {
+        apiInflight.delete(cacheKey);
+      });
+      apiInflight.set(cacheKey, fetchPromise);
+    }
+
+    fetchPromise.then(({ status, headers, body }) => {
+      sendCompressed(req, res, body, status, {
+        ...headers,
+        'X-Cache': 'MISS',
+      });
+    }).catch(e => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'upstream_error', message: e.message }));
     });
-    upstreamReq.end();
     return;
   }
 
