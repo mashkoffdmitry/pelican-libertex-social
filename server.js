@@ -750,6 +750,7 @@ const server = http.createServer((req, res) => {
     const exp = parseInt(env.EXPIRES_AT || '0', 10);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
+      app_env: process.env.APP_ENV || 'unknown',
       hasToken: !!env.ACCESS_TOKEN,
       expires_at: exp || null,
       seconds_left: exp ? exp - now : null,
