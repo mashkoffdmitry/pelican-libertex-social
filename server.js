@@ -6,7 +6,9 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.8';
+// Must name a version that is actually on npm: the demo page loads it from
+// unpkg. 0.4.8 (welcome modal off by default) failed to publish on 2026-09-25.
+const PKG_VERSION = '0.4.7';
 // Demo page reads the static catalog from the Cloudflare Worker (edge, R2) when
 // one is configured, and keeps live per-strategy calls on this proxy. Derived
 // from CATALOG_INGEST_URL so no extra env var is needed; unset → legacy
@@ -32,6 +34,9 @@ const INDEX_HTML = `<!DOCTYPE html>
   <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
   <script>
+    // 0.4.7 still opens the welcome modal unless it was dismissed within the
+    // last 30 min; mark it dismissed on every load so the demo page never shows it.
+    try { localStorage.setItem('pelican-welcome-dismissed-at', String(Date.now())); } catch (e) {}
     const { createApp, h } = Vue;
     const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
     createApp({ render: () => h(PelicanComponent, { apiBase: '', catalogBase: ${JSON.stringify(CATALOG_BASE)} }) }).mount('#app');
