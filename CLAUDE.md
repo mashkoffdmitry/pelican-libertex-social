@@ -22,8 +22,8 @@ artifacts:
 | `refresher.js` | Loop that calls `oidc-client.js` to rotate the access token before expiry. |
 | `oidc-client.js` | Pure-Node `authorization_code+PKCE` walk against `identity.copy-trade.io`. **Critical:** `followRedirects` decodes `&amp;` in Location headers — IdP returns HTML-entity-encoded ampersands and `URL()` chokes on them. Don't remove that. |
 | `start.sh` | Supervises `server.js` + `refresher.js`. **busybox-compatible** — `wait -n` doesn't exist on Alpine, uses `kill -0` poll loop instead. |
-| `Dockerfile` | `node:22.11-alpine3.20` pinned, tini, non-root user `app`, HEALTHCHECK on `/healthz`. |
-| `vue/` | Vue 3 SFC + Vite library mode → `@mashkovd/pelican-vue` on npmjs. Decoupled SemVer from the proxy. |
+| `Dockerfile` | Two stages: `node:22.11-bookworm-slim` builds `vue/` (plus the Vue runtime) into `./widget`; `node:22.11-alpine3.20` runs the proxy — tini, non-root user `app`, HEALTHCHECK on `/healthz`. |
+| `vue/` | Vue 3 SFC + Vite library mode. Built into the proxy image and served at `/widget/*` (the demo page uses it); also published as `@mashkovd/pelican-vue` on npmjs for external installs. Decoupled SemVer from the proxy. |
 | `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deployed by CI on push to `main` when `worker/**` changed, markdown excluded (job `deploy-worker`, secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`); manual fallback `cd worker && npx wrangler deploy`. |
 | `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
 | `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy` and `deploy-worker` (push-to-main only). |
@@ -160,6 +160,14 @@ mctl_deploy_service action=deploy team_name=labs component_name=pelican-proxy \
 **Rollback:** `mctl_rollback_service team=labs name=pelican-proxy image_tag=<prev-tag>`
 
 ## Vue component publishing
+
+**The demo page does not depend on npm.** The image builds `vue/` from the same
+commit and `server.js` serves it at `/widget/pelican-libertex-social.umd.cjs`,
+`/widget/style.css`, `/widget/vue.global.prod.js` (CORS `*`, 5 min cache); the
+page adds `?v=<build time>`. A widget change ships with the next proxy deploy.
+`PKG_VERSION` in `server.js` is only the unpkg fallback when no bundle exists
+(local dev without `npm run build`). External sites can embed from
+`https://labs-pelican-proxy.mctl.ai/widget/…` or install from npm.
 
 `@mashkovd/pelican-vue` is on **npmjs.com** (public, anonymous install — switched there from GitHub Packages because GHP requires auth even for public packages). Independent SemVer from proxy.
 
