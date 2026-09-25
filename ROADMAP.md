@@ -116,6 +116,14 @@ a Libertex-tenant user and reads the Pelican API.
   **189 × 429**, paused ~30 s roughly every 35 s and still finished complete
   (3 126 rows, `stats-err=0`, 467 s). That rebuild had no disk catalog, so it
   fetched `/stats` for all 3 126 rows instead of ~1 340.
+  The next one (21:16 UTC, after #18, seeded from R2) skipped `/stats` for
+  1 791 disabled rows and made no 400 calls, yet still got **170 × 429**
+  (3 124 rows, `stats-err=0`, 463 s). Fewer calls barely moved the 429 count:
+  the throttle is on the request rate, not the total, so the lever is
+  concurrency, not call volume.
+- A deploy restarts the pod and kills a rebuild in progress; the new pod starts
+  it again from scratch. On 2026-09-25 two back-to-back deploys (21:11, 21:15)
+  made the due rebuild run three times, each attempt drawing its own 429s.
 - Live calls have no shared budget. The proxy caps each visitor IP at
   120 req/min and caches each URL (15 s for signals), so upstream load scales
   with the number of visitors.
