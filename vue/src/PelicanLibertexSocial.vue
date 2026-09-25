@@ -48,6 +48,11 @@ const props = withDefaults(
     columns?: ColumnKey[]; // reserved; not yet wired through
     locale?: string;
     pageSize?: number;
+    /**
+     * Show the Libertex Social copy-trading welcome modal (video + how-to
+     * steps). Off by default: an embedded catalog widget does not need it.
+     */
+    welcome?: boolean;
   }>(),
   {
     theme: 'auto',
@@ -55,6 +60,7 @@ const props = withDefaults(
     defaultSort: 'return-desc',
     locale: 'en-US',
     pageSize: PAGE_SIZE,
+    welcome: false,
   },
 );
 
@@ -225,7 +231,7 @@ onMounted(() => catalog.start());
         </StrategyTable>
       </main>
 
-      <WelcomeModal />
+      <WelcomeModal v-if="welcome" />
   </div>
 </template>
 

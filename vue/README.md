@@ -72,6 +72,7 @@ in `quasar.config.js`.
 | `defaultFilters` | `Partial<FiltersState>`           | `{}`             | Initial filter values                    |
 | `locale`         | `string`                          | `'en-US'`        | Used for number/date formatting          |
 | `pageSize`       | `number`                          | `20`             | Rows per page                            |
+| `welcome`        | `boolean`                         | `false`          | Show the Libertex Social welcome modal (video and how-to steps) on load and again 30 min after it is closed |
 
 ### Two-origin example (proxy + edge)
 

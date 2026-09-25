@@ -6,7 +6,7 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-const PKG_VERSION = '0.4.7';
+const PKG_VERSION = '0.4.8';
 // Demo page reads the static catalog from the Cloudflare Worker (edge, R2) when
 // one is configured, and keeps live per-strategy calls on this proxy. Derived
 // from CATALOG_INGEST_URL so no extra env var is needed; unset → legacy
