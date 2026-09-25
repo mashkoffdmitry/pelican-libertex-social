@@ -92,37 +92,32 @@ jobs:
   publish-vue:
     name: publish @mashkovd/pelican-vue to npm
     needs: [vue]
-    # Only publish on push to main AND only when NPM_TOKEN is configured.
-    # Skips silently on forks / contributors who haven't set the secret.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # npm Trusted Publishing (OIDC): npmjs.com trusts this repo + ci.yml, so no
+    # long-lived NPM_TOKEN is needed (the token expired on 2026-09-25 and the
+    # 0.4.8 publish failed). The repository guard keeps forks from trying.
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.repository == 'mashkoffdmitry/pelican-libertex-social'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # OIDC token for npm trusted publishing (and provenance)
     defaults:
       run:
         working-directory: vue
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip if NPM_TOKEN unset
-        id: gate
-        run: |
-          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "::warning::NPM_TOKEN secret not set — skipping npm publish"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/setup-node@v4
-        if: steps.gate.outputs.skip != 'true'
         with:
-          node-version: '22'
+          # Trusted publishing needs npm >= 11.5.1; Node 24 ships npm 11.
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: npm
           cache-dependency-path: vue/package-lock.json
 
       - name: Check if version already published
         id: check
-        if: steps.gate.outputs.skip != 'true'
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
@@ -134,17 +129,15 @@ jobs:
           fi
 
       - name: Install & build
-        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
+        if: steps.check.outputs.already != 'true'
         run: npm ci && npm run build
 
       - name: Publish
-        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        if: steps.check.outputs.already != 'true'
+        run: npm publish --provenance --access public
 
       - name: Summary
-        if: steps.gate.outputs.skip != 'true' && steps.check.outputs.already != 'true'
+        if: steps.check.outputs.already != 'true'
         run: |
           echo "📦 Published @mashkovd/pelican-vue@${{ steps.check.outputs.version }} to npm" >> "$GITHUB_STEP_SUMMARY"
 
