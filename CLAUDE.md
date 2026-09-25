@@ -121,9 +121,23 @@ A parallel, isolated proxy instance running alongside production for team collab
 6. When fully tested on staging, open a PR from `staging` into `main` for production release.
 
 ### R2 catalog safety:
-- Staging reads the production catalog on cold start (`seedFromR2()` via `CATALOG_INGEST_URL=https://pelican-catalog-worker.pelican-libertex.workers.dev/__ingest`), ensuring immediate readiness (~2s) without a cold build.
-- `CATALOG_INGEST_SECRET` is intentionally **omitted** from staging secrets, so background catalog rebuilds NEVER overwrite the production R2 catalog.
-- In-memory cache protects the Libertex API account from upstream rate limits during testing.
+- **Staging never rebuilds the catalog.** `APP_ENV=staging` turns on read-only mode
+  (`CATALOG_REBUILD=on|off` overrides): it seeds from the Worker
+  (`seedFromR2()` via `CATALOG_INGEST_URL=https://pelican-catalog-worker.pelican-libertex.workers.dev/__ingest`)
+  and re-seeds every `CATALOG_RESEED_MIN` (30) minutes. Only production spends
+  upstream requests on rebuilds. Reason: on 2026-09-25 staging and production
+  rebuilt at the same moment, the second one lost every discover call to upstream
+  throttling, and production pushed a 592-row catalog to R2 for ~6 h.
+- `CATALOG_INGEST_SECRET` is intentionally **omitted** from staging secrets, so staging can never overwrite the production R2 catalog.
+- Staging's live clicks (signals, per-strategy stats, search) still go upstream on its own token.
+
+### Catalog shrink guard
+A rebuild with fewer than `CATALOG_MIN_RATIO` (0.8) of the previous catalog's rows
+is dropped: the previous catalog stays in memory, on disk and in R2, and the
+rebuild retries after `CATALOG_REJECT_RETRY_MIN` (30) minutes. `/__status` shows
+`catalog.last_rejected_build` and `upstream_errors` (failed upstream calls by
+status, split into `build` and `live`); the logs carry `[catalog] … upstream
+errors`, `[upstream] 429 …` and throttled `[live] upstream <status> …` lines.
 
 
 ## Deploy flow (CD)
