@@ -73,21 +73,20 @@ const ALLOWED = [
   /^\/api\/brokers\/?$/,
 ];
 function pathAllowed(p) { return ALLOWED.some(re => re.test(p)); }
+// Minimum search length the upstream accepts on /api/strategies?filter=.
+const MIN_FILTER_LEN = 3;
 
 // ---- catalog cache: aggregated full list of strategies via filter scan ----
 const CATALOG_TTL_MS = 10 * 60 * 1000;
 let catalogCache = { at: 0, items: null, building: null };
 
-const SCAN_QUERIES = (() => {
-  const out = [];
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  for (const c of chars) out.push(c);
-  const v = 'aeiouy', con = 'bcdfghjklmnprstvwz';
-  for (const a of v) for (const b of con) out.push(a + b);
-  for (const a of con) for (const b of v) out.push(a + b);
-  for (const p of ['gold','forex','trade','sca','pro','vip','sig','bot','old','ing','er','fx','top','ai','%E2']) out.push(p);
-  return Array.from(new Set(out));
-})();
+// Search terms for the substring scan. The upstream rejects filters shorter than
+// MIN_FILTER_LEN with 400 and returns at most 50 rows per query, so the old
+// 1–2-character sweep (254 of 266 queries) found nothing. These terms still
+// work and, measured 2026-09-25, add ~425 strategies the discover groups miss
+// (22 of them enabled); the discover groups carry the rest of the catalog.
+const SCAN_QUERIES = ['gold', 'forex', 'trade', 'sca', 'pro', 'vip', 'sig', 'bot', 'old', 'ing', 'top', '%E2']
+  .filter(q => q.length >= MIN_FILTER_LEN);
 
 const upstreamAgent = new https.Agent({ keepAlive: true, maxSockets: 32, maxFreeSockets: 16 });
 
@@ -300,9 +299,9 @@ const REBUILD_ENABLED = (() => {
 const RESEED_MIN = parseInt(process.env.CATALOG_RESEED_MIN) || 30;
 let reseeding = null;
 
-function saveCatalogToDisk(items) {
+function saveCatalogToDisk(items, at = Date.now()) {
   try {
-    fs.writeFileSync(CATALOG_FILE, JSON.stringify({ at: Date.now(), items }));
+    fs.writeFileSync(CATALOG_FILE, JSON.stringify({ at, items }));
     console.log(`[catalog] persisted ${items.length} items to ${CATALOG_FILE}`);
   } catch (e) { console.error('[catalog] persist failed:', e.message); }
 }
@@ -335,6 +334,11 @@ async function seedFromR2() {
     const ageH = ((Date.now() - (j.at || 0)) / 3600000).toFixed(1);
     fullCache = { at: j.at || Date.now(), items: j.items, partial: null, building: null, progress: { loaded: j.items.length, total: j.items.length } };
     console.log(`[r2] seeded ${j.items.length} items from R2 (age ${ageH}h)`);
+    // Persist the seed with its original build time: buildFull() reads the
+    // previous catalog from disk to skip /stats for known-disabled rows, and a
+    // fresh pod has no disk copy, so the first rebuild after every deploy used to
+    // fetch stats for all ~3 100 rows instead of ~1 300 (2026-09-25: 189 × 429).
+    if (REBUILD_ENABLED) saveCatalogToDisk(j.items, j.at || Date.now());
     // If the seeded catalog predates the History-baking change, force an immediate
     // rebuild so the next R2 push includes per-strategy History. Without this the
     // first deploy after the schema change has to wait the full rebuild interval
@@ -950,17 +954,16 @@ const server = http.createServer((req, res) => {
     if (tooMany(req)) { res.writeHead(429, { 'Retry-After':'60' }); return res.end('rate_limited'); }
     const env = readEnv();
     if (!env.ACCESS_TOKEN) { res.writeHead(503); return res.end('no_token'); }
-    // Read-only mode derives the id+name list from the R2 catalog instead of
-    // running the ~270-request substring scan against the upstream account.
-    const source = REBUILD_ENABLED
-      ? getCatalog(env.ACCESS_TOKEN)
-      : getFull(env.ACCESS_TOKEN).then(items => items.map(({ Id, Name, ImageUploaded, Profile }) => ({ Id, Name, ImageUploaded, Profile })));
-    source.then(items => {
+    // Derived from the built catalog, never from a fresh upstream scan: this
+    // endpoint is anonymous, and scanning here let any visitor trigger ~290
+    // upstream calls on the shared account every 10 minutes (2026-09-25).
+    getFull(env.ACCESS_TOKEN).then(full => {
+      const items = full.map(({ Id, Name, ImageUploaded, Profile }) => ({ Id, Name, ImageUploaded, Profile }));
       sendCompressed(req, res, Buffer.from(JSON.stringify(items)), 200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=300',
-        'X-Catalog-Built-At': String(catalogCache.at),
+        'X-Catalog-Built-At': String(fullCache.at),
         'X-Catalog-Size': String(items.length),
       });
     }).catch(e => {
@@ -983,6 +986,12 @@ const server = http.createServer((req, res) => {
     if (tooMany(req)) {
       res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
       return res.end(JSON.stringify({ error: 'rate_limited', limit: RATE_LIMIT + '/min' }));
+    }
+    // The upstream rejects a search shorter than 3 characters with 400; answer
+    // it here instead of spending a call on the shared account.
+    if (/^\/api\/strategies\/?$/.test(u.pathname) && typeof u.query.filter === 'string' && u.query.filter.length < MIN_FILTER_LEN) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify(`Filter must be at least ${MIN_FILTER_LEN} characters long.`));
     }
 
     const cacheKey = req.url;

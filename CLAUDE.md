@@ -189,6 +189,12 @@ enabled, otherwise `npm publish` 403s on accounts with 2FA.
 
 ## Common gotchas
 
+- **Upstream search limits:** `papi.copy-trade.io` answers `/api/strategies?filter=`
+  shorter than 3 characters with 400 (`"Filter must be at least 3 characters long."`,
+  changed without notice around 2026-09) and returns at most 50 rows per query.
+  The proxy answers short filters itself; the catalog scan uses only ≥3-char terms
+  and the `/api/discover/*` groups carry most of the catalog. `/api/strategies-all`
+  is derived from the built catalog — never scan upstream on an anonymous request.
 - **IdP `&amp;` Location bug:** `identity.copy-trade.io` returns
   HTML-entity-encoded ampersands in 302 Location headers. `oidc-client.js`
   decodes them in `followRedirects`. If a fresh OIDC walk starts failing
