@@ -26,7 +26,7 @@ artifacts:
 | `vue/` | Vue 3 SFC + Vite library mode. Built into the proxy image and served at `/widget/*` (the demo page uses it); also published as `@mashkovd/pelican-vue` on npmjs for external installs. Decoupled SemVer from the proxy. |
 | `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deployed by CI on push to `main` when `worker/**` changed, markdown excluded (job `deploy-worker`, secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`); manual fallback `cd worker && npx wrangler deploy`. |
 | `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
-| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy` and `deploy-worker` (push-to-main only). |
+| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy`, `deploy-worker` and `publish-vue` (push-to-main only; npm via trusted publishing, no token), `deploy-staging`, `preview`. |
 | `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. Optionally `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` for Worker push. |
 
 ## Production
@@ -171,20 +171,23 @@ page adds `?v=<build time>`. A widget change ships with the next proxy deploy.
 
 `@mashkovd/pelican-vue` is on **npmjs.com** (public, anonymous install — switched there from GitHub Packages because GHP requires auth even for public packages). Independent SemVer from proxy.
 
-To publish a new version:
-```
-cd vue
-# bump "version" in package.json (e.g. 0.2.0 → 0.2.1)
-echo '//registry.npmjs.org/:_authToken=<npm-granular-token>' > ~/.npmrc
-npm run build
-npm publish    # 2FA bypassed only by granular tokens with that flag enabled
-rm ~/.npmrc    # don't leave the token sitting around
-```
+To publish a new version: bump `"version"` in `vue/package.json` and push to
+`main`. The `publish-vue` job publishes it; a version already on npm is skipped.
+`preview/*` branches publish `<version>-preview.<run>` under the `preview` dist-tag.
 
-The npm scope `@mashkovd` is owned by user `mashkovd` on npmjs.com.
-Granular access tokens (https://www.npmjs.com/settings/mashkovd/tokens)
-must have **"Bypass two-factor authentication when publishing"**
-enabled, otherwise `npm publish` 403s on accounts with 2FA.
+**No npm token exists anywhere.** Both jobs use npm Trusted Publishing (OIDC):
+npmjs.com trusts `mashkoffdmitry/pelican-libertex-social` + workflow `ci.yml`
+(no environment) — see https://www.npmjs.com/package/@mashkovd/pelican-vue/access.
+The jobs need `permissions: id-token: write`, Node 24 (npm ≥ 11.5.1) and
+`npm publish --provenance`; no `NODE_AUTH_TOKEN`. Renaming `ci.yml` or moving the
+repo breaks publishing until the trusted publisher on npm is updated.
+
+History: the `NPM_TOKEN` secret (granular, bypass-2FA) stopped working on
+2026-09-25 — npm restricts 2FA-bypassing tokens since Aug 2026 — and 0.4.8 failed
+with `E404 PUT`. It was replaced by trusted publishing (#22) and the secret deleted.
+Don't reintroduce a token or publish from a laptop: the scope `@mashkovd` is owned
+by npm user `mashkovd` with 2FA on a security key, so a local `npm publish` needs
+that key in hand.
 
 ## Conventions
 
