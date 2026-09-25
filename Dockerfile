@@ -1,3 +1,14 @@
+# ---- widget build ----
+# Builds @mashkovd/pelican-vue from this commit so the proxy serves it at
+# /widget/* instead of pulling a published version from npm/unpkg. Debian, not
+# Alpine: the lockfile carries rollup's glibc binary, not the musl one.
+FROM node:22.11-bookworm-slim AS widget
+WORKDIR /vue
+COPY vue/package.json vue/package-lock.json ./
+RUN npm ci
+COPY vue/ ./
+RUN npx vite build && cp node_modules/vue/dist/vue.global.prod.js dist/
+
 FROM node:22.11-alpine3.20
 
 # tini for proper signal handling of two child processes (server + refresher)
@@ -13,6 +24,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY server.js refresher.js oidc-client.js r2-uploader.js start.sh bg-blob.png bg-blob2.png logo.png favicon.png ./
+COPY --from=widget /vue/dist/pelican-libertex-social.umd.cjs /vue/dist/pelican-libertex-social.mjs /vue/dist/style.css /vue/dist/vue.global.prod.js ./widget/
 
 RUN chmod +x start.sh && \
     addgroup -S app && adduser -S -G app -h /home/app app && \

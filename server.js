@@ -6,9 +6,6 @@ const url = require('url');
 const zlib = require('zlib');
 const { uploadCatalog } = require('./r2-uploader');
 
-// Must name a version that is actually on npm: the demo page loads it from
-// unpkg. 0.4.8 (welcome modal off by default) failed to publish on 2026-09-25.
-const PKG_VERSION = '0.4.7';
 // Demo page reads the static catalog from the Cloudflare Worker (edge, R2) when
 // one is configured, and keeps live per-strategy calls on this proxy. Derived
 // from CATALOG_INGEST_URL so no extra env var is needed; unset → legacy
@@ -17,6 +14,58 @@ const CATALOG_BASE = (() => {
   try { return process.env.CATALOG_INGEST_URL ? new URL(process.env.CATALOG_INGEST_URL).origin : ''; }
   catch { return ''; }
 })();
+
+// ---- widget bundle served by this process ----
+// The Docker image builds vue/ and copies its dist (plus the Vue runtime) to
+// ./widget, so the demo page always runs the widget from the same commit as the
+// proxy — no npm publish, no token, no unpkg. Local dev falls back to vue/dist
+// after `npm run build` in vue/. Published at /widget/<file> with CORS, so an
+// external page can embed the widget from here too.
+const WIDGET_FILES = {
+  'pelican-libertex-social.umd.cjs': 'application/javascript; charset=utf-8',
+  'pelican-libertex-social.mjs': 'application/javascript; charset=utf-8',
+  'style.css': 'text/css; charset=utf-8',
+  'vue.global.prod.js': 'application/javascript; charset=utf-8',
+};
+const WIDGET_DIR = [path.join(__dirname, 'widget'), path.join(__dirname, 'vue', 'dist')]
+  .find(d => fs.existsSync(path.join(d, 'pelican-libertex-social.umd.cjs'))) || null;
+const widgetCache = new Map(); // file -> Buffer
+function readWidgetFile(name) {
+  if (!WIDGET_DIR || !WIDGET_FILES[name]) return null;
+  if (!widgetCache.has(name)) {
+    let file = path.join(WIDGET_DIR, name);
+    // vue/dist has no Vue runtime; take it from vue/node_modules in local dev.
+    if (name === 'vue.global.prod.js' && !fs.existsSync(file)) {
+      file = path.join(__dirname, 'vue', 'node_modules', 'vue', 'dist', name);
+    }
+    if (!fs.existsSync(file)) return null;
+    widgetCache.set(name, fs.readFileSync(file));
+  }
+  return widgetCache.get(name);
+}
+// A version string for cache-busting the demo page's asset URLs: the bundle's
+// mtime is the image build time, so a redeploy changes it.
+const WIDGET_REV = WIDGET_DIR
+  ? String(Math.floor(fs.statSync(path.join(WIDGET_DIR, 'pelican-libertex-social.umd.cjs')).mtimeMs))
+  : '';
+// Last published npm version; used only when no local bundle exists.
+const PKG_VERSION = '0.4.7';
+const ASSET = WIDGET_DIR
+  ? {
+      css: `/widget/style.css?v=${WIDGET_REV}`,
+      vue: readWidgetFile('vue.global.prod.js') ? `/widget/vue.global.prod.js?v=${WIDGET_REV}` : 'https://unpkg.com/vue@3.5/dist/vue.global.prod.js',
+      js: `/widget/pelican-libertex-social.umd.cjs?v=${WIDGET_REV}`,
+    }
+  : {
+      css: `https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css`,
+      vue: 'https://unpkg.com/vue@3.5/dist/vue.global.prod.js',
+      js: `https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs`,
+    };
+// npm 0.4.7 opens the welcome modal on load; the local bundle has it off by
+// default (`welcome` prop). Only the npm fallback needs it marked dismissed.
+const SUPPRESS_WELCOME = WIDGET_DIR
+  ? ''
+  : "try { localStorage.setItem('pelican-welcome-dismissed-at', String(Date.now())); } catch (e) {}";
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,19 +73,17 @@ const INDEX_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libertex Social</title>
   <link rel="icon" type="image/png" href="/logo.png">
-  <link rel="stylesheet" href="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/style.css">
+  <link rel="stylesheet" href="${ASSET.css}">
   <style>
     * { box-sizing: border-box; } html, body { margin: 0; padding: 0; }
   </style>
 </head>
 <body>
   <div id="app"></div>
-  <script src="https://unpkg.com/vue@3.5/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/@mashkovd/pelican-vue@${PKG_VERSION}/dist/pelican-libertex-social.umd.cjs"></script>
+  <script src="${ASSET.vue}"></script>
+  <script src="${ASSET.js}"></script>
   <script>
-    // 0.4.7 still opens the welcome modal unless it was dismissed within the
-    // last 30 min; mark it dismissed on every load so the demo page never shows it.
-    try { localStorage.setItem('pelican-welcome-dismissed-at', String(Date.now())); } catch (e) {}
+    ${SUPPRESS_WELCOME}
     const { createApp, h } = Vue;
     const PelicanComponent = window.PelicanLibertexSocial.PelicanLibertexSocial;
     createApp({ render: () => h(PelicanComponent, { apiBase: '', catalogBase: ${JSON.stringify(CATALOG_BASE)} }) }).mount('#app');
@@ -1085,6 +1132,20 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'upstream_error', message: e.message }));
     });
     return;
+  }
+
+  // ---- widget bundle (see WIDGET_FILES) ----
+  if (u.pathname.startsWith('/widget/')) {
+    const name = u.pathname.slice('/widget/'.length);
+    const body = readWidgetFile(name);
+    if (!body) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('not found'); }
+    return sendCompressed(req, res, body, 200, {
+      'Content-Type': WIDGET_FILES[name],
+      'Access-Control-Allow-Origin': '*',
+      // Unversioned URL: short cache so a redeploy reaches embedders quickly;
+      // the demo page adds ?v=<build> and gets the same short cache.
+      'Cache-Control': 'public, max-age=300',
+    });
   }
 
   // ---- static assets (blobs + brand logo + favicon) ----
