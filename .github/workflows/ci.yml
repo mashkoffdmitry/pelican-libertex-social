@@ -403,6 +403,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write   # npm trusted publishing, same as publish-vue
     env:
       MCTL_API: https://api.mctl.ai/api/v1
       TEAM: labs
@@ -412,8 +413,8 @@ jobs:
       - name: Gate secrets
         id: gate
         run: |
-          if [ -z "${{ secrets.NPM_TOKEN }}" ] || [ -z "${{ secrets.MCTL_GITHUB_TOKEN }}" ]; then
-            echo "::warning::NPM_TOKEN or MCTL_GITHUB_TOKEN not configured — skipping preview"
+          if [ -z "${{ secrets.MCTL_GITHUB_TOKEN }}" ] || [ "${{ github.repository }}" != "mashkoffdmitry/pelican-libertex-social" ]; then
+            echo "::warning::MCTL_GITHUB_TOKEN not configured or running in a fork — skipping preview"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -427,7 +428,8 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.skip != 'true'
         with:
-          node-version: '22'
+          # Trusted publishing needs npm >= 11.5.1; Node 24 ships npm 11.
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: npm
           cache-dependency-path: vue/package-lock.json
@@ -453,9 +455,7 @@ jobs:
           npm ci
           npm run build
           npm version --no-git-tag-version "${{ steps.ver.outputs.pre }}"
-          npm publish --tag preview --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --provenance --tag preview --access public
 
       - name: Create preview git tag (ephemeral PKG_VERSION patch)
         if: steps.gate.outputs.skip != 'true'
