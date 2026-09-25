@@ -126,6 +126,38 @@ function upstreamGet(p, token, timeoutMs = 20000) {
   });
 }
 
+// ---- upstream error accounting ----
+// Every failed call to papi.copy-trade.io lands here, so /__status and the logs
+// show what the platform answered (429 vs 5xx vs timeout) instead of a silent
+// catch. `where` is 'build' (catalog rebuild) or 'live' (visitor passthrough).
+const upstreamStats = { since: Date.now(), build: {}, live: {}, last429At: null, lastErrorAt: null, lastError: null };
+function errorKind(e) {
+  if (e && e.status) return String(e.status);
+  if (e && /timeout/i.test(e.message || '')) return 'timeout';
+  return 'network';
+}
+function noteUpstreamError(where, p, kind) {
+  const bucket = upstreamStats[where];
+  bucket[kind] = (bucket[kind] || 0) + 1;
+  upstreamStats.lastErrorAt = Date.now();
+  upstreamStats.lastError = `${where} ${kind} ${String(p).split('?')[0]}`;
+  if (kind === '429') upstreamStats.last429At = upstreamStats.lastErrorAt;
+}
+// At most one line per key every 10s, with a count of what was suppressed, so a
+// 429 storm is visible without flooding the log.
+const throttledLog = new Map(); // key -> { at, suppressed }
+function logThrottled(key, msg) {
+  const now = Date.now();
+  const cur = throttledLog.get(key);
+  if (cur && now - cur.at < 10_000) { cur.suppressed++; return; }
+  const extra = cur && cur.suppressed ? ` (+${cur.suppressed} similar suppressed)` : '';
+  throttledLog.set(key, { at: now, suppressed: 0 });
+  console.warn(msg + extra);
+}
+function summarizeErrors(counts) {
+  return Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(' ');
+}
+
 // global pause until this timestamp (when we hit 429)
 let pauseUntil = 0;
 async function maybeWaitForPause() {
@@ -140,9 +172,13 @@ async function upstreamGetRetry(p, token, attempts = 4) {
     try { return await upstreamGet(p, token, 20000); }
     catch (e) {
       lastErr = e;
+      noteUpstreamError('build', p, errorKind(e));
       if (e.status === 401) throw e;
       if (e.status === 429) {
         const wait = (e.retryAfter > 0 ? e.retryAfter * 1000 : 30000) + Math.random() * 1000;
+        if (pauseUntil <= Date.now()) {
+          console.warn(`[upstream] 429 on ${p.split('?')[0]} — pausing rebuild ${Math.round(wait / 1000)}s`);
+        }
         pauseUntil = Math.max(pauseUntil, Date.now() + wait);
         await new Promise(r => setTimeout(r, wait));
       } else {
@@ -170,24 +206,35 @@ const DISCOVER_CODES_CATALOG = [
 async function buildCatalog(token) {
   const map = new Map();
   const concurrency = 5;
+  const scanErrs = {}, discoverErrs = {};
+  const countErr = (counts, p, e) => {
+    const kind = errorKind(e);
+    counts[kind] = (counts[kind] || 0) + 1;
+    noteUpstreamError('build', p, kind);
+  };
 
   // 1. Substring scan
   let i = 0;
   await Promise.all(Array.from({ length: concurrency }, async () => {
     while (i < SCAN_QUERIES.length) {
       const q = SCAN_QUERIES[i++];
+      const p = '/api/strategies?filter=' + encodeURIComponent(q);
       try {
-        const arr = await upstreamGet('/api/strategies?filter=' + encodeURIComponent(q), token);
+        const arr = await upstreamGet(p, token);
         if (Array.isArray(arr)) for (const it of arr) if (it && it.Id) map.set(it.Id, it);
-      } catch (e) {}
+      } catch (e) { countErr(scanErrs, p, e); }
     }
   }));
   console.log(`[catalog] after substring scan: ${map.size}`);
+  if (Object.keys(scanErrs).length) {
+    console.warn(`[catalog] substring scan upstream errors: ${summarizeErrors(scanErrs)}`);
+  }
 
   // 2. Discover groups (sequential, low pressure)
   for (const code of DISCOVER_CODES_CATALOG) {
+    const p = '/api/discover/' + code;
     try {
-      const arr = await upstreamGet('/api/discover/' + code, token);
+      const arr = await upstreamGet(p, token);
       if (Array.isArray(arr)) {
         for (const it of arr) {
           const s = it.Strategy;
@@ -200,9 +247,12 @@ async function buildCatalog(token) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { countErr(discoverErrs, p, e); }
   }
   console.log(`[catalog] after discover groups: ${map.size}`);
+  if (Object.keys(discoverErrs).length) {
+    console.warn(`[catalog] discover upstream errors (${DISCOVER_CODES_CATALOG.length} groups): ${summarizeErrors(discoverErrs)}`);
+  }
 
   return [...map.values()];
 }
@@ -227,6 +277,28 @@ const REBUILD_INTERVAL_H = parseInt(process.env.CATALOG_REBUILD_INTERVAL_H) || 6
 const FULL_TTL_MS = (REBUILD_INTERVAL_H + 2) * 60 * 60 * 1000;
 const CATALOG_FILE = path.join(ROOT, '.catalog.json');
 let fullCache = { at: 0, items: null, partial: null, building: null, progress: { loaded: 0, total: 0 }, built_in_s: null };
+
+// Shrink guard: a rebuild that comes back with far fewer strategies than the
+// catalog it replaces is almost always upstream throttling (every discover call
+// failing at once), not a real change. Such a build is dropped: the previous
+// catalog stays in memory, on disk and in R2, and the rebuild retries sooner.
+// Incident 2026-09-25: a 592-row build replaced 3 124 rows in R2 for ~6 h.
+const MIN_RATIO = parseFloat(process.env.CATALOG_MIN_RATIO) || 0.8;
+const REJECT_RETRY_MIN = parseInt(process.env.CATALOG_REJECT_RETRY_MIN) || 30;
+let lastRejectedBuild = null; // { at, items, previous }
+
+// Read-only mode: this instance never rebuilds the catalog against the upstream
+// account. It seeds from the Worker (R2) and re-seeds every CATALOG_RESEED_MIN
+// minutes, so only production spends upstream requests on rebuilds. Default: on
+// for APP_ENV=staging, off elsewhere; CATALOG_REBUILD=on|off overrides.
+const REBUILD_ENABLED = (() => {
+  const v = String(process.env.CATALOG_REBUILD || '').toLowerCase();
+  if (['off', '0', 'false', 'no'].includes(v)) return false;
+  if (['on', '1', 'true', 'yes'].includes(v)) return true;
+  return process.env.APP_ENV !== 'staging';
+})();
+const RESEED_MIN = parseInt(process.env.CATALOG_RESEED_MIN) || 30;
+let reseeding = null;
 
 function saveCatalogToDisk(items) {
   try {
@@ -470,6 +542,12 @@ async function buildFull(token) {
 
 async function collectDiscoverMeta(token) {
   const map = new Map();
+  const errs = {};
+  const countErr = (p, e) => {
+    const kind = errorKind(e);
+    errs[kind] = (errs[kind] || 0) + 1;
+    noteUpstreamError('build', p, kind);
+  };
   // ranking signal: lower number = higher priority (used to schedule stat fetches first)
   const setRank = (id, rank) => {
     const cur = map.get(id) || {};
@@ -496,7 +574,7 @@ async function collectDiscoverMeta(token) {
         }
       }
     }
-  } catch {}
+  } catch (e) { countErr('/api/discover', e); }
   // Pull ranked-by-return strategies separately for priority queue
   for (const code of ['GlobalSignals', 'ReturnLastQuarter', 'ReturnLastMonth', 'TopFreeSignals']) {
     try {
@@ -515,13 +593,25 @@ async function collectDiscoverMeta(token) {
           setRank(s.Id, it.Rank ?? 99999);
         }
       }
-    } catch {}
+    } catch (e) { countErr('/api/discover/' + code, e); }
+  }
+  if (Object.keys(errs).length) {
+    console.warn(`[full] discover meta upstream errors: ${summarizeErrors(errs)}`);
   }
   return map;
 }
 
 function getFull(token) {
   const now = Date.now();
+  if (!REBUILD_ENABLED) {
+    // Read-only: serve whatever R2 gave us, however old; never build.
+    if (fullCache.items) return Promise.resolve(fullCache.items);
+    if (!reseeding) reseeding = seedFromR2().finally(() => { reseeding = null; });
+    return reseeding.then(() => {
+      if (fullCache.items) return fullCache.items;
+      throw new Error('catalog not available: read-only mode and the R2 seed failed');
+    });
+  }
   // Fresh items: return immediately.
   if (fullCache.items && (now - fullCache.at) < FULL_TTL_MS) return Promise.resolve(fullCache.items);
   // Stale items + already rebuilding: serve stale (don't make user wait).
@@ -530,8 +620,19 @@ function getFull(token) {
   if (fullCache.items && !fullCache.building) {
     fullCache.building = (async () => {
       const t0 = Date.now();
+      const prev = fullCache.items;
       const items = await buildFull(token);
       const built_in_s = +((Date.now()-t0)/1000).toFixed(1);
+      if (items.length < prev.length * MIN_RATIO) {
+        lastRejectedBuild = { at: Date.now(), items: items.length, previous: prev.length };
+        console.warn(`[full] rejected rebuild: ${items.length} items < ${Math.round(MIN_RATIO * 100)}% of previous ${prev.length} — keeping previous catalog (not persisted, not uploaded), retry in ${REJECT_RETRY_MIN} min`);
+        // Mark the kept catalog as built REJECT_RETRY_MIN before the next due
+        // rebuild: fresh enough that requests don't trigger a rebuild, stale
+        // enough that the scheduler retries after REJECT_RETRY_MIN.
+        fullCache = { ...fullCache, at: Date.now() - REBUILD_INTERVAL_H * 3600_000 + REJECT_RETRY_MIN * 60_000,
+          items: prev, partial: prev, building: null, progress: { loaded: prev.length, total: prev.length } };
+        return prev;
+      }
       fullCache = { at: Date.now(), items, partial: fullCache.items, building: null, progress: { loaded: items.length, total: items.length }, built_in_s };
       console.log(`[full] background-rebuilt ${items.length} enriched strategies in ${built_in_s}s`);
       saveCatalogToDisk(items);
@@ -557,6 +658,14 @@ function getFull(token) {
 
 // ---- interval scheduler: rebuild every CATALOG_REBUILD_INTERVAL_H hours ----
 function startScheduler() {
+  if (!REBUILD_ENABLED) {
+    console.log(`[scheduler] read-only: no rebuilds; re-seeding from R2 every ${RESEED_MIN} min`);
+    if (!process.env.CATALOG_INGEST_URL) console.warn('[scheduler] read-only but CATALOG_INGEST_URL is unset — no catalog source');
+    setInterval(() => {
+      if (!reseeding) reseeding = seedFromR2().finally(() => { reseeding = null; });
+    }, RESEED_MIN * 60_000);
+    return;
+  }
   console.log(`[scheduler] rebuild every ${REBUILD_INTERVAL_H}h (FULL_TTL ${REBUILD_INTERVAL_H + 2}h)`);
   setInterval(() => {
     const ageMs = fullCache.at ? Date.now() - fullCache.at : Infinity;
@@ -756,6 +865,23 @@ const server = http.createServer((req, res) => {
       seconds_left: exp ? exp - now : null,
       expired: exp ? now >= exp : null,
       api_cache_entries: apiCache.size,
+      catalog: {
+        rebuild: REBUILD_ENABLED ? `every ${REBUILD_INTERVAL_H}h` : `off (read-only, R2 re-seed every ${RESEED_MIN} min)`,
+        items: fullCache.items ? fullCache.items.length : 0,
+        built_at: fullCache.at || null,
+        last_rejected_build: lastRejectedBuild,
+      },
+      // Failed calls to papi.copy-trade.io since this process started, by status
+      // ('429', '5xx', 'timeout', 'network'); 'build' = catalog rebuild, 'live' =
+      // visitor requests passed through.
+      upstream_errors: {
+        since: upstreamStats.since,
+        build: upstreamStats.build,
+        live: upstreamStats.live,
+        last_429_at: upstreamStats.last429At,
+        last_error_at: upstreamStats.lastErrorAt,
+        last_error: upstreamStats.lastError,
+      },
     }));
   }
 
@@ -824,7 +950,12 @@ const server = http.createServer((req, res) => {
     if (tooMany(req)) { res.writeHead(429, { 'Retry-After':'60' }); return res.end('rate_limited'); }
     const env = readEnv();
     if (!env.ACCESS_TOKEN) { res.writeHead(503); return res.end('no_token'); }
-    getCatalog(env.ACCESS_TOKEN).then(items => {
+    // Read-only mode derives the id+name list from the R2 catalog instead of
+    // running the ~270-request substring scan against the upstream account.
+    const source = REBUILD_ENABLED
+      ? getCatalog(env.ACCESS_TOKEN)
+      : getFull(env.ACCESS_TOKEN).then(items => items.map(({ Id, Name, ImageUploaded, Profile }) => ({ Id, Name, ImageUploaded, Profile })));
+    source.then(items => {
       sendCompressed(req, res, Buffer.from(JSON.stringify(items)), 200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -896,6 +1027,10 @@ const server = http.createServer((req, res) => {
             delete headers['content-length'];
             headers['Access-Control-Allow-Origin'] = '*';
             const status = upstreamRes.statusCode || 200;
+            if (status >= 400 && status !== 404) {
+              noteUpstreamError('live', u.pathname, String(status));
+              logThrottled(`live-${status}`, `[live] upstream ${status} on ${u.pathname}`);
+            }
             if (status === 200) {
               apiCache.set(cacheKey, {
                 status,
@@ -914,7 +1049,11 @@ const server = http.createServer((req, res) => {
             resolve({ status, headers, body });
           });
         });
-        upstreamReq.on('error', reject);
+        upstreamReq.on('error', e => {
+          noteUpstreamError('live', u.pathname, errorKind(e));
+          logThrottled('live-network', `[live] upstream request failed on ${u.pathname}: ${e.message}`);
+          reject(e);
+        });
         upstreamReq.end();
       }).finally(() => {
         apiInflight.delete(cacheKey);
@@ -994,7 +1133,9 @@ server.listen(PORT, () => {
     if (env.ACCESS_TOKEN) {
       const left = parseInt(env.EXPIRES_AT || '0', 10) - Math.floor(Date.now() / 1000);
       console.log(`token loaded (${left}s left)`);
-      if (!hasCache) {
+      if (!hasCache && !REBUILD_ENABLED) {
+        console.warn('[startup] read-only mode and no catalog from R2 yet — will retry on the next re-seed');
+      } else if (!hasCache) {
         // No disk cache and R2 is empty — kick off initial build
         setTimeout(() => {
           console.log('[startup] no cache — building catalog now…');
@@ -1010,8 +1151,8 @@ server.listen(PORT, () => {
         const e = readEnv();
         if (e.ACCESS_TOKEN) {
           clearInterval(poll);
-          if (hasCache) {
-            console.log('[startup] token available — catalog already seeded from R2, skipping rebuild');
+          if (hasCache || !REBUILD_ENABLED) {
+            console.log(`[startup] token available — ${hasCache ? 'catalog already seeded from R2' : 'read-only mode'}, skipping rebuild`);
           } else {
             console.log('[startup] token now available — building catalog…');
             getFull(e.ACCESS_TOKEN).then(items => {
