@@ -263,8 +263,9 @@ returns the same enabled-only `Strategy[]` as the proxy; `?raw=1` returns the
 with the numbers behind each trade-off. Currently two: individual trades are not
 in the catalog (aggregates only; baking them in would make them hours stale and
 tens of MB, a separate 15-min open-positions dump is the candidate), and all
-traffic runs on one personal Libertex login (a service account is the
-prerequisite). Read it before proposing to bake per-trade data into
+traffic runs on one personal Libertex-tenant login on the vendor Pelican's
+copy-trading platform, which serves `identity`/`papi.copy-trade.io` (a service
+account is the prerequisite). Read it before proposing to bake per-trade data into
 `/api/strategies-full` or to add constant upstream load.
 
 ## External resources

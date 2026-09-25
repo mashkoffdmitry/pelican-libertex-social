@@ -94,13 +94,21 @@ Until those are answered, option 1 stands.
 
 **Status:** open. Risk, not a feature request.
 
+`identity.copy-trade.io` and `papi.copy-trade.io` are not run by Libertex. They are
+the shared white-label copy-trading platform of **Pelican** — the vendor, not this
+project — (Pelican Exchange Ltd,
+UK 09437275; Pelican Exchange Europe (CY) Ltd, CySEC 441/24). Libertex is one
+tenant on it (`client_id=libertexweb`, `acr_values=tenant:Libertex`), alongside
+Axi, IC Markets, Pepperstone, Vantage, Titan FX and others. The proxy logs in with
+a Libertex-tenant user and reads the Pelican API.
+
 ### What is true today
 
 - The 6-hourly rebuild and every visitor's live click (signals, per-strategy
   refresh, search) use the same access token, minted by `refresher.js` from one
   personal login (`LIBERTEX_EMAIL`).
-- Libertex does not publish a rate limit for `papi.copy-trade.io`, so the
-  headroom is unknown. The rebuild alone runs at ~7 req/s for ~11 min.
+- Pelican does not publish a rate limit for `papi.copy-trade.io`, and it is
+  most likely shared across all broker tenants, so the headroom is unknown. The rebuild alone runs at ~7 req/s for ~11 min.
 - Live calls have no shared budget. The proxy caps each visitor IP at
   120 req/min and caches each URL (15 s for signals), so upstream load scales
   with the number of visitors.
@@ -117,9 +125,12 @@ Until those are answered, option 1 stands.
 2. **Second account (or a small pool) for live visitor traffic**, so a rebuild's
    429s cannot break clicks and the other way round. Requires the proxy to hold
    two tokens (two refresher loops or one loop with two credential sets).
-3. **Official partner access from Libertex** with a documented quota — the only
+3. **Official partner access from Pelican** (with Libertex as the tenant) with a
+   documented quota — the only
    option that turns "unknown headroom" into a number.
-4. **Meanwhile, in the proxy:** a global upstream budget for live calls and a
+4. **Check the terms.** Automated access under a personal user must be checked
+   against Pelican's published terms (`docs.pelicantrading.io`) before scaling it.
+5. **Meanwhile, in the proxy:** a global upstream budget for live calls and a
    short queue that honours `pauseUntil` instead of passing 429 through.
 
 Option 1 is the prerequisite for option 2 of the trades decision above.
