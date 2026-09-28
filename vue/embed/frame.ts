@@ -9,7 +9,7 @@
 //                                        element + window.dataLayer
 //
 // Without the parent helper the iframe keeps its own height (inner scroll).
-import { dispatchHostEvent, pushDataLayer, type EventName } from './events';
+import { dispatchHostEvent, pushDataLayer, EVENT_NAMES, type EventName } from './events';
 
 const P = 'libertex-social:';
 const T_READY = P + 'ready';
@@ -99,8 +99,6 @@ export function startFrameChild(hostEl: HTMLElement, root: HTMLElement, version:
 }
 
 // --------------------------------------------------------------- parent ----
-
-const EVENT_NAMES: readonly EventName[] = ['ready', 'error', 'strategy-open', 'subscribe-click'];
 
 function frameOrigin(f: HTMLIFrameElement): string | null {
   try {

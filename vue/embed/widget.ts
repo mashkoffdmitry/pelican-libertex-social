@@ -7,7 +7,7 @@ import logoSrc from './assets/logo.webp';
 import { applyStyles } from './styles';
 import { registerFonts } from './fonts';
 import { resolveOptions, type EmbedOptions, type ResolvedOptions } from './options';
-import { dispatchHostEvent, pushDataLayer, strategyIdFromHref, type EventName } from './events';
+import { dispatchHostEvent, isCopyTradeHome, pushDataLayer, strategyIdFromHref, type EventName } from './events';
 import { startFrameChild, type FrameChild } from './frame';
 
 export const VERSION = __PELICAN_EMBED_VERSION__;
@@ -130,7 +130,8 @@ export function mount(el: HTMLElement, opts: EmbedOptions = {}, mode: MountMode 
           fetchProgress: false,
           onError: (e: PelicanError) =>
             emit('error', { message: e?.message, code: e?.code, status: e?.status }),
-          onSelectStrategy: (s: Strategy) => emit('strategy-open', { strategyId: s.Id, name: s.Name }),
+          // Expand only: select-strategy also fires when a row is collapsed.
+          onExpandStrategy: (s: Strategy) => emit('strategy-open', { strategyId: s.Id, name: s.Name }),
           'onUpdate:lang': (l: string) => {
             props.lang = l as ResolvedOptions['lang'];
           },
@@ -197,6 +198,7 @@ export function mount(el: HTMLElement, opts: EmbedOptions = {}, mode: MountMode 
     if (!a) return;
     const id = strategyIdFromHref(a.href);
     if (id != null) emit('subscribe-click', { strategyId: id, href: a.href });
+    else if (isCopyTradeHome(a.href)) emit('brand-click', { href: a.href });
   };
   shadow.addEventListener('click', onClick, true);
 

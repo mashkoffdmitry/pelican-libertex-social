@@ -18,7 +18,7 @@
 ```bash
 cd vue
 npm ci
-npm run build:embed      # vue-tsc (tsconfig.embed.json) + vite build --config vite.embed.config.ts
+npm run build:embed      # vue-tsc (tsconfig.embed.json, tsconfig.embed-node.json) + vite build --config vite.embed.config.ts
 npm run preview:embed    # http://localhost:4180/demo.html
 ```
 
@@ -31,10 +31,15 @@ npm run preview:embed    # http://localhost:4180/demo.html
 | `demo.html`, `demo-hosts/*.css` | страница для QA: оба способа встраивания, EN и RU, переключатель CSS сайтов |
 | `OFL-Manrope.txt` | лицензия шрифта Manrope (SIL OFL 1.1) |
 
-Сборка падает, если постобработка CSS не нашла ровно ожидаемое число совпадений
-(см. `embed/build/plugin.ts`). В выходе не может быть `url(/`, `fonts.googleapis`,
-`process.env`. Значит, после изменений в компоненте CI сам скажет, что сборку виджета
-надо посмотреть.
+Постобработка CSS (`embed/build/plugin.ts`) терпима к обычным правкам компонента: новый
+`@media`-блок просто становится `@container`, отклонения от известной формы CSS идут
+предупреждениями. Сборка падает, только если виджет на сайте реально сломается: не
+найдены брейкпоинты компактной раскладки / карточек (обрежется Subscribe), в выход попали
+`url(/`, `fonts.googleapis`, `process.env` или неопределённая CSS-переменная. Код сборки
+(`vite.embed.config.ts`, `embed/build/`) проверяется `tsconfig.embed-node.json`.
+
+В GitHub CI виджет собирает отдельная информационная job `embed`: её падение не
+блокирует deploy прокси и публикацию npm.
 
 Переменные окружения сборки (необязательные):
 
@@ -90,8 +95,8 @@ www.fxclub.org/social-trading (RU):
 | `data-theme` | `dark`, `light`, `auto` | `dark`. Посетитель всё равно может переключить тему в шапке виджета |
 | `data-blobs` | `on`, `off` | `on` (фоновые «пятна», как в оригинале) |
 | `data-lazy` | `on`, `off` | `on`: монтирование, когда до виджета остаётся ~800 px прокрутки |
-| `data-locale` | BCP 47, например `en-US` | `en-US` (формат чисел) |
-| `data-link-params` | query string | пусто. Проходят только `utm_*` и `ref`, `partner`, `aff_id`, `sub_id`, `click_id`, `promo`; добавляются к ссылкам на libertex.copy-trade.io |
+| `data-locale` | BCP 47, например `en-US` | `en-US` (формат чисел). Тег, который не принимает `Intl` (например `en-12`), заменяется на `en-US` с предупреждением |
+| `data-link-params` | query string | пусто. Проходят только `utm_*` и `ref`, `partner`, `aff_id`, `sub_id`, `click_id`, `promo`; добавляются ко всем ссылкам на libertex.copy-trade.io (стратегии и логотип в шапке) |
 | `data-datalayer` | `off` | включено |
 | `data-api-base`, `data-catalog-base` | абсолютный `https://` URL | значения сборки. Относительные, `http:` и одинаковые адреса отклоняются с предупреждением в консоли |
 
@@ -105,8 +110,9 @@ www.fxclub.org/social-trading (RU):
 |---|---|---|
 | `libertex-social:ready` | `{version, lang}` — появились строки каталога | `pelican_ready` |
 | `libertex-social:error` | `{message, code, status}` | `pelican_error` |
-| `libertex-social:strategy-open` | `{strategyId, name}` | — |
+| `libertex-social:strategy-open` | `{strategyId, name}` — строка раскрыта (при сворачивании не приходит) | — |
 | `libertex-social:subscribe-click` | `{strategyId, href}` | `pelican_subscribe_click` с `strategy_id` |
+| `libertex-social:brand-click` | `{href}` — клик по логотипу в шапке | `pelican_brand_click` |
 
 `window.dataLayer` создаётся, если его нет (обычный контракт GTM). Отключить: `data-datalayer="off"`.
 
@@ -197,6 +203,12 @@ BUILD_CACHE_DIR="vue/node_modules"
   При 1072–1079 px боковые отступы 24 px (колонка fxclub.org — ровно 1072 px).
 - «Пятна» остаются `position: fixed`, как на полной странице, но обрезаются по виджету
   (`clip-path: inset(0)`); `min-height` 720 px вместо 100vh.
+- Известное ограничение (Windows/Linux с ClearType): стеклянные панели компонента
+  (`backdrop-filter`, как в оригинале) заставляют Chrome рисовать текст **всей** страницы
+  сайта без субпиксельного сглаживания (оттенки серого вместо LCD). Цвет и шрифт не
+  меняются; на macOS разницы нет. Изоляция CSS-ом не помогает (проверены isolation,
+  contain, will-change). Кому это важно, ставит iframe-вариант (`frame.html`): там текст
+  сайта не затронут.
 
 ---
 
@@ -213,7 +225,7 @@ page (`/widget/*`) do not depend on it: the default `vite build` is unchanged.
 ```bash
 cd vue
 npm ci
-npm run build:embed      # vue-tsc (tsconfig.embed.json) + vite build --config vite.embed.config.ts
+npm run build:embed      # vue-tsc (tsconfig.embed.json, tsconfig.embed-node.json) + vite build --config vite.embed.config.ts
 npm run preview:embed    # http://localhost:4180/demo.html
 ```
 
@@ -221,9 +233,13 @@ Output in `vue/dist-embed/` (all of it goes to the bucket): `pelican-widget.js` 
 ~320 KB, ~158 KB gzip, pure ASCII, fonts and images inlined), `frame.html` (iframe
 fallback with a CSP meta), `demo.html` + `demo-hosts/*.css` (QA page), `OFL-Manrope.txt`.
 
-The build fails if a CSS rewrite does not match exactly the expected number of times
-(`embed/build/plugin.ts`), or if `url(/`, `fonts.googleapis` or `process.env` reach the
-output. Optional build env: `PELICAN_API_BASE`, `PELICAN_CATALOG_BASE` (default
+The CSS post-processing (`embed/build/plugin.ts`) tolerates ordinary component changes
+(a new `@media` block simply becomes `@container`; deviations are warnings). The build
+fails only when the widget would really break on a host page: the compact / card-row
+breakpoints cannot be found (Subscribe would be cut), or `url(/`, `fonts.googleapis`,
+`process.env` or an undefined custom property reach the output. The build code itself is
+type-checked by `tsconfig.embed-node.json`. On GitHub the widget is built by a separate,
+informational `embed` job that no deploy/publish job depends on. Optional build env: `PELICAN_API_BASE`, `PELICAN_CATALOG_BASE` (default
 endpoints), `CI_COMMIT_SHORT_SHA` / `GITHUB_SHA` (appended to the version). The version is
 the **root** `package.json` version (the S3 folder name in the corp pipeline).
 
@@ -257,8 +273,10 @@ Loading the script twice is harmless. Pin a version with `/<version>/` instead o
 `data-lang` (`en|ru|es`, default: page `<html lang>`, else `en`) · `data-theme`
 (`dark|light|auto`, default `dark`; visitors can still toggle) · `data-blobs` (`on|off`,
 default `on`) · `data-lazy` (`on|off`, default `on`, mounts ~800 px before the viewport) ·
-`data-locale` (default `en-US`) · `data-link-params` (only `utm_*` and `ref`, `partner`,
-`aff_id`, `sub_id`, `click_id`, `promo` pass; appended to libertex.copy-trade.io links) ·
+`data-locale` (default `en-US`; a tag `Intl` rejects, e.g. `en-12`, falls back to `en-US`
+with a warning) · `data-link-params` (only `utm_*` and `ref`, `partner`, `aff_id`,
+`sub_id`, `click_id`, `promo` pass; appended to every libertex.copy-trade.io link: the
+strategy links and the header logo) ·
 `data-datalayer="off"` · `data-api-base` / `data-catalog-base` (absolute `https://` only,
 must differ; otherwise a console warning and the build defaults). No welcome modal, no
 `localStorage` writes on the host.
@@ -267,9 +285,11 @@ must differ; otherwise a console warning and the build defaults). No welcome mod
 
 CustomEvents on the host element (bubbles, composed): `libertex-social:ready`
 `{version, lang}`, `libertex-social:error` `{message, code, status}`,
-`libertex-social:strategy-open` `{strategyId, name}`, `libertex-social:subscribe-click`
-`{strategyId, href}`. `window.dataLayer` gets `pelican_ready`, `pelican_error`,
-`pelican_subscribe_click` (`strategy_id`) unless `data-datalayer="off"`.
+`libertex-social:strategy-open` `{strategyId, name}` (row expanded; not sent on collapse),
+`libertex-social:subscribe-click` `{strategyId, href}`, `libertex-social:brand-click`
+`{href}` (header logo). `window.dataLayer` gets `pelican_ready`, `pelican_error`,
+`pelican_subscribe_click` (`strategy_id`), `pelican_brand_click` unless
+`data-datalayer="off"`.
 
 ### JS API
 
@@ -333,3 +353,10 @@ Subscribe is cut), rows become cards up to 1071 px, 1072–1079 px get 24 px sid
 (fxclub.org's column is exactly 1072 px). The background blobs stay `position: fixed` like
 on the full page but are clipped to the widget (`clip-path: inset(0)`); `min-height` is
 720 px instead of 100vh.
+
+Known limitation (Windows/Linux with ClearType): the component's glass panels
+(`backdrop-filter`, as in the original) make Chrome render the text of the **whole** host
+page with grayscale instead of subpixel (LCD) antialiasing; colours and fonts do not
+change, macOS is unaffected. No CSS containment helps (isolation, contain, will-change
+tested). Use the iframe fallback (`frame.html`) where this matters: it leaves the host
+text untouched.

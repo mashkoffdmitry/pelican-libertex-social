@@ -133,7 +133,7 @@
 
   var log = document.getElementById('qa-log');
   function line(t) { log.textContent = (t + '\n' + log.textContent).slice(0, 4000); }
-  ['ready', 'error', 'strategy-open', 'subscribe-click'].forEach(function (n) {
+  ['ready', 'error', 'strategy-open', 'subscribe-click', 'brand-click'].forEach(function (n) {
     document.addEventListener('libertex-social:' + n, function (e) {
       line('event ' + n + ' ' + JSON.stringify(e.detail));
     });

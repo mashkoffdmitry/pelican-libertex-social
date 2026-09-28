@@ -73,6 +73,11 @@ in `quasar.config.js`.
 | `locale`         | `string`                          | `'en-US'`        | Used for number/date formatting          |
 | `pageSize`       | `number`                          | `20`             | Rows per page                            |
 | `welcome`        | `boolean`                         | `false`          | Show the Libertex Social welcome modal (video and how-to steps) on load and again 30 min after it is closed |
+| `lang`           | `'en' \| 'ru' \| 'es'`            | `'en'`           | UI language; the header toggle cycles it at runtime. Persists in `localStorage['pelican-lang']` |
+| `logoSrc`        | `string`                          | `'/logo.png'`    | Logo image URL for the header (and the welcome modal) |
+| `linkParams`     | `string`                          | `''`             | Query params appended to every libertex.copy-trade.io link (strategy links and the header logo), e.g. `utm_source=site&utm_medium=widget`. Sanitised: plain keys only, re-encoded, a leading `?` is allowed |
+| `persist`        | `boolean`                         | `true`           | Remember theme/language in `localStorage` (and read them back on load) |
+| `fetchProgress`  | `boolean`                         | `true`           | With a separate `catalogBase`: also fetch `/api/strategies-full/progress` (feeds `builtAt` only) |
 
 ### Two-origin example (proxy + edge)
 
@@ -92,7 +97,9 @@ through the pelican-proxy, which holds the OIDC token.
 | event              | payload                                                                | when                              |
 | ------------------ | ---------------------------------------------------------------------- | --------------------------------- |
 | `update:theme`     | `'auto' \| 'dark' \| 'light'`                                          | User cycled the theme toggle      |
-| `select-strategy`  | `Strategy`                                                             | A row was expanded                |
+| `update:lang`      | `'en' \| 'ru' \| 'es'`                                                 | User cycled the language toggle   |
+| `select-strategy`  | `Strategy`                                                             | A row was expanded or collapsed   |
+| `expand-strategy`  | `Strategy`                                                             | A row was expanded (not on collapse) |
 | `error`            | `{ code: 'no_token' \| 'fetch_failed' \| 'http_error' \| string, message }` | Network / proxy error             |
 
 ## Slots

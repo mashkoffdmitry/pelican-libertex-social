@@ -1,9 +1,18 @@
 // Widget -> host page events.
 //  * CustomEvent 'libertex-social:<name>' on the host element (bubbles, composed)
 //  * window.dataLayer.push({event: 'pelican_<name>', ...}) for GTM (opt-out:
-//    data-datalayer="off"); only ready / error / subscribe_click are pushed.
+//    data-datalayer="off"); ready / error / subscribe_click / brand_click are
+//    pushed (strategy-open is a CustomEvent only).
 
-export type EventName = 'ready' | 'error' | 'strategy-open' | 'subscribe-click';
+export type EventName = 'ready' | 'error' | 'strategy-open' | 'subscribe-click' | 'brand-click';
+
+export const EVENT_NAMES: readonly EventName[] = [
+  'ready',
+  'error',
+  'strategy-open',
+  'subscribe-click',
+  'brand-click',
+];
 
 export const EVENT_PREFIX = 'libertex-social:';
 
@@ -11,6 +20,7 @@ const DATALAYER: Partial<Record<EventName, string>> = {
   ready: 'pelican_ready',
   error: 'pelican_error',
   'subscribe-click': 'pelican_subscribe_click',
+  'brand-click': 'pelican_brand_click',
 };
 
 export function dispatchHostEvent(target: EventTarget, name: EventName, detail: Record<string, unknown>): void {
@@ -43,4 +53,9 @@ export function pushDataLayer(name: EventName, detail: Record<string, unknown>):
 export function strategyIdFromHref(href: string): number | null {
   const m = /^https:\/\/libertex\.copy-trade\.io\/strategy\/(\d+)/.exec(href);
   return m ? Number(m[1]) : null;
+}
+
+/** The header logo link: libertex.copy-trade.io/ (with or without a query). */
+export function isCopyTradeHome(href: string): boolean {
+  return /^https:\/\/libertex\.copy-trade\.io\/?(?:[?#]|$)/.test(href);
 }

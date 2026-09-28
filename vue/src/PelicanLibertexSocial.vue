@@ -29,7 +29,7 @@ import {
   LOGO_SRC_KEY,
   LINK_PARAMS_KEY,
 } from './injection-keys';
-import { sanitizeLinkParams } from './utils/links';
+import { copyTradeUrl, sanitizeLinkParams } from './utils/links';
 import ThemeToggle from './components/ThemeToggle.vue';
 import './styles/index.css';
 
@@ -97,6 +97,8 @@ const emit = defineEmits<{
   (e: 'update:theme', m: ThemeMode): void;
   (e: 'update:lang', l: Lang): void;
   (e: 'select-strategy', s: Strategy): void;
+  /** Only when a row gets expanded (select-strategy fires on every toggle). */
+  (e: 'expand-strategy', s: Strategy): void;
   (e: 'error', err: PelicanError): void;
 }>();
 
@@ -104,7 +106,10 @@ provide(API_BASE_KEY, props.apiBase);
 provide(CATALOG_BASE_KEY, props.catalogBase ?? props.apiBase);
 provide(LOCALE_KEY, props.locale);
 provide(LOGO_SRC_KEY, toRef(props, 'logoSrc'));
-provide(LINK_PARAMS_KEY, computed(() => sanitizeLinkParams(props.linkParams)));
+const linkQs = computed(() => sanitizeLinkParams(props.linkParams));
+provide(LINK_PARAMS_KEY, linkQs);
+// Header logo link carries the same params as the strategy links.
+const brandHref = computed(() => copyTradeUrl('/', linkQs.value));
 
 const apiBaseRef = toRef(props, 'apiBase');
 const catalogBaseRef = toRef(props, 'catalogBase');
@@ -160,6 +165,7 @@ function toggleRow(id: number) {
   } else {
     expanded.clear();
     expanded.add(id);
+    emit('expand-strategy', s);
   }
 }
 
@@ -198,7 +204,7 @@ onMounted(() => catalog.start());
   <div class="pelican-libsoc" :class="`theme-${themeApi.resolved.value}`">
     <header class="brand-row">
         <slot name="brand">
-          <a class="brand" href="https://libertex.copy-trade.io/" target="_blank" rel="noopener">
+          <a class="brand" :href="brandHref" target="_blank" rel="noopener">
             <span class="logo-tile"><img :src="logoSrc" alt="" /></span>
             <span class="brand-text">
               <span class="brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>

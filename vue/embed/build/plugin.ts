@@ -1,7 +1,14 @@
 // Build-time post-processing for the embeddable widget (vite.embed.config.ts).
-// Runs in generateBundle on the MINIFIED component CSS and fails the build if
-// any rewrite does not match exactly the expected number of times — a changed
-// component must be looked at, not silently shipped half-rewritten.
+// Runs in generateBundle on the MINIFIED component CSS.
+//
+// Tolerant by design: an ordinary component CSS change (a new @media block, a
+// removed font import, ...) must not break this build. It only FAILS on what
+// would visibly break the widget on a host page:
+//   - the compact / card-row layout breakpoints can no longer be retargeted
+//     (the Subscribe column would be cut), or
+//   - a root-absolute url(/...), a Google Fonts reference or an undefined
+//     custom property would reach the bundle (see the final gates).
+// Everything else that deviates from the known component shape is a warning.
 import type { Plugin } from 'vite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -22,90 +29,103 @@ const COMPACT_MAX = 1423;
 /** Below 1072 px the row cannot fit at all: switch to the card rows the
  *  component otherwise uses on phones (<= 720 px). */
 const CARDS_MAX = 1071;
+/** Only layout-level breakpoints are retargeted; narrower blocks are phone
+ *  tweaks and keep their width (as container queries). */
+const RETARGET_MIN_ORIGINAL = 600;
 /** Custom properties the component sets inline from JS (not in any CSS). */
 const INLINE_VARS = ['lo', 'hi', 'fill'];
+/** Selectors whose blocks make the layout "compact" (one column, filters
+ *  behind the Filters button). Every one must be retargeted. */
+const COMPACT_MARKERS = ['.pelican-main[', '.pelican-filters[', '.filters-toggle['];
+/** Selectors whose blocks switch rows to vertical cards and hide the head. */
+const CARDS_MARKERS = ['.pelican-row[', '.row.head['];
 
 type Fail = (msg: string) => never;
+type Warn = (msg: string) => void;
 
-function replaceCounted(css: string, re: RegExp, to: string, expected: number, what: string, fail: Fail): string {
+function replaceAll(css: string, re: RegExp, to: string): { css: string; n: number } {
   let n = 0;
   const out = css.replace(re, () => {
     n++;
     return to;
   });
-  if (n !== expected) fail(`${what}: expected exactly ${expected} match(es), found ${n}`);
-  return out;
+  return { css: out, n };
 }
 
-/** Splits `@media (max-width:Npx){...}` blocks (balanced braces). */
-function mediaBlocks(css: string): Array<{ start: number; end: number; text: string }> {
-  const re = /@media\s*\(\s*max-width\s*:\s*\d+px\s*\)\s*\{/g;
-  const out: Array<{ start: number; end: number; text: string }> = [];
+/** Index just past the '}' closing the block whose '{' ends right before `from`. */
+function blockEnd(css: string, from: number): number {
+  let depth = 1;
+  let j = from;
+  while (depth && j < css.length) {
+    if (css[j] === '{') depth++;
+    else if (css[j] === '}') depth--;
+    j++;
+  }
+  return j;
+}
+
+interface MediaBlock {
+  start: number;
+  end: number;
+  /** Full block text including the braces. */
+  text: string;
+  /** Just `max-width:Npx` (single-condition block), else null. */
+  maxWidth: number | null;
+}
+
+/** Width-only `@media (max|min-width:Npx) [and (...)] {...}` blocks (balanced
+ *  braces). Other media queries (prefers-*, print, ...) stay untouched. */
+function mediaBlocks(css: string): MediaBlock[] {
+  const cond = String.raw`\(\s*(?:max|min)-width\s*:\s*\d+px\s*\)`;
+  const re = new RegExp(String.raw`@media\s*(${cond}(?:\s*and\s*${cond})*)\s*\{`, 'g');
+  const out: MediaBlock[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(css))) {
-    let depth = 1;
-    let j = m.index + m[0].length;
-    while (depth && j < css.length) {
-      if (css[j] === '{') depth++;
-      else if (css[j] === '}') depth--;
-      j++;
-    }
-    out.push({ start: m.index, end: j, text: css.slice(m.index, j) });
+    const j = blockEnd(css, m.index + m[0].length);
+    const single = /^\(\s*max-width\s*:\s*(\d+)px\s*\)$/.exec(m[1].trim());
+    out.push({ start: m.index, end: j, text: css.slice(m.index, j), maxWidth: single ? Number(single[1]) : null });
     re.lastIndex = j;
   }
   return out;
 }
 
-export function postprocessComponentCss(input: string, fail: Fail): string {
+export function postprocessComponentCss(input: string, fail: Fail, warn: Warn = () => {}): string {
   let css = input;
+  let r: { css: string; n: number };
 
   // 1) Google Fonts @import: inside a shadow root @font-face is ignored, and the
   //    font is self-hosted anyway (no third-party request). Must go FIRST: its
   //    URL contains "family=Manrope" too.
-  css = replaceCounted(
-    css,
-    /@import\s*(?:url\(\s*)?["']https:\/\/fonts\.googleapis\.com\/[^"']*["']\s*\)?\s*;?/g,
-    '',
-    1,
-    'Google Fonts @import',
-    fail,
-  );
+  r = replaceAll(css, /@import\s*(?:url\(\s*)?["']https:\/\/fonts\.googleapis\.com\/[^"']*["']\s*\)?\s*;?/g, '');
+  css = r.css;
+  if (r.n !== 1) warn(`Google Fonts @import: expected 1, removed ${r.n}`);
 
   // 2) Root-absolute blob images would resolve against the HOST origin.
-  //    embed.css sets the bundled WebP instead.
-  css = replaceCounted(css, /url\(\s*["']?\/bg-blob2?\.png["']?\s*\)/g, 'none', 2, 'url(/bg-blob*.png)', fail);
+  //    embed.css sets the bundled WebP instead. (Any other url(/...) fails the
+  //    final gate.)
+  r = replaceAll(css, /url\(\s*["']?\/bg-blob2?\.png["']?\s*\)/g, 'none');
+  css = r.css;
+  if (r.n !== 2) warn(`url(/bg-blob*.png): expected 2, replaced ${r.n}`);
 
-  // 3) Family rename (index.css root font + WelcomeModal).
-  css = replaceCounted(
-    css,
-    /(["']?)(?<![\w-])Manrope(?![\w-])\1/g,
-    "'Pelican Manrope'",
-    2,
-    'Manrope font-family token',
-    fail,
-  );
+  // 3) Family rename (index.css root font + WelcomeModal) -> the self-hosted
+  //    face registered by embed/fonts.ts.
+  r = replaceAll(css, /(["']?)(?<![\w-])Manrope(?![\w-])\1/g, "'Pelican Manrope'");
+  css = r.css;
+  if (r.n < 1) warn('no Manrope font-family token found: the component font changed?');
 
   // 4) Viewport breakpoints -> container breakpoints (container = .pel-root),
   //    except the full-screen welcome modal (really viewport-sized).
+  // 5) Retarget layout breakpoints so the Subscribe column is never cut (the
+  //    original page cuts it at viewport widths 721-1423 px):
+  //    - blocks that make the layout "compact" -> COMPACT_MAX: next to the
+  //      filters the row needs 1424 px;
+  //    - "card rows" blocks (row as a vertical list, table head hidden) ->
+  //      CARDS_MAX: even without filters the row needs 1022 px + 2 px border
+  //      + 2 x 24 px padding = 1072 px.
+  //    Other blocks (e.g. expanded-row details at 1024 px, phone tweaks)
+  //    keep their width.
   const blocks = mediaBlocks(css);
-  if (blocks.length !== 7) fail(`@media (max-width) blocks: expected 7, found ${blocks.length}`);
-  const modal = blocks.filter((b) => b.text.includes('.welcome-'));
-  if (modal.length !== 1) fail(`welcome-modal @media blocks: expected 1, found ${modal.length}`);
-
-  // 5) Retarget breakpoints so the Subscribe column is never cut (the original
-  //    page cuts it at viewport widths 721-1423 px):
-  //    - the three blocks that make the layout "compact" (one column, filters
-  //      behind the Filters button) -> COMPACT_MAX: next to the filters the
-  //      row needs 1424 px;
-  //    - the two "card rows" blocks (row as a vertical list, table head
-  //      hidden) -> CARDS_MAX: even without filters the row needs 1022 px +
-  //      2 px border + 2 x 24 px padding = 1072 px.
-  //    The remaining block (expanded-row details, 1024 px) keeps its value.
-  const COMPACT_MARKERS = ['.pelican-main[', '.pelican-filters[', '.filters-toggle['];
-  const CARDS_MARKERS = ['.pelican-row[', '.row.head['];
-  let compact = 0;
-  let cards = 0;
-  let converted = 0;
+  const seen = new Set<string>();
   let out = '';
   let pos = 0;
   for (const b of blocks) {
@@ -116,24 +136,38 @@ export function postprocessComponentCss(input: string, fail: Fail): string {
       continue;
     }
     let text = b.text.replace(/^@media/, '@container');
-    converted++;
-    const isCompact = COMPACT_MARKERS.some((mk) => text.includes(mk));
-    const isCards = CARDS_MARKERS.some((mk) => text.includes(mk));
-    if (isCompact && isCards) fail('a @media block matches both compact and card-row markers');
-    if (isCompact) {
-      text = text.replace(/max-width\s*:\s*\d+px/, `max-width:${COMPACT_MAX}px`);
-      compact++;
-    } else if (isCards) {
-      text = text.replace(/max-width\s*:\s*\d+px/, `max-width:${CARDS_MAX}px`);
-      cards++;
+    const compact = COMPACT_MARKERS.filter((mk) => text.includes(mk));
+    const cards = CARDS_MARKERS.filter((mk) => text.includes(mk));
+    if (b.maxWidth != null && b.maxWidth >= RETARGET_MIN_ORIGINAL && (compact.length || cards.length)) {
+      if (compact.length && cards.length) {
+        fail(`a @media (max-width:${b.maxWidth}px) block mixes compact and card-row selectors`);
+      }
+      const to = compact.length ? COMPACT_MAX : CARDS_MAX;
+      text = text.replace(/max-width\s*:\s*\d+px/, `max-width:${to}px`);
+      for (const mk of [...compact, ...cards]) seen.add(mk);
     }
     out += text;
   }
   out += css.slice(pos);
   css = out;
-  if (converted !== 6) fail(`@media -> @container: expected 6 blocks, converted ${converted}`);
-  if (compact !== 3) fail(`compact breakpoint retarget: expected 3 blocks, found ${compact}`);
-  if (cards !== 2) fail(`card-rows breakpoint retarget: expected 2 blocks, found ${cards}`);
+
+  const missing = [...COMPACT_MARKERS, ...CARDS_MARKERS].filter((mk) => !seen.has(mk));
+  if (missing.length) {
+    fail(
+      `layout breakpoint not found for ${missing.join(', ')}: the compact / card-row ` +
+        '@media (max-width) blocks changed — update COMPACT_MARKERS / CARDS_MARKERS',
+    );
+  }
+  // Any width @media left over (other than the welcome modal) still reacts to
+  // the host VIEWPORT, not to the widget width.
+  for (const m of css.matchAll(/@media([^{]*)\{/g)) {
+    if (!/width/.test(m[1])) continue;
+    const start = m.index ?? 0;
+    const end = blockEnd(css, start + m[0].length);
+    if (!css.slice(start, end).includes('.welcome-')) {
+      warn(`@media${m[1]} was not converted to @container (unsupported condition)`);
+    }
+  }
 
   return css;
 }
@@ -201,7 +235,7 @@ export function pelicanEmbed(o: EmbedPluginOptions): Plugin {
       const rawCss = String((cssAsset as { source: string | Uint8Array }).source);
       delete bundle[cssKeys[0]];
 
-      const css = postprocessComponentCss(rawCss, fail);
+      const css = postprocessComponentCss(rawCss, fail, (msg) => this.warn('[pelican-embed] ' + msg));
 
       const chunks = Object.values(bundle).filter((c) => c.type === 'chunk');
       if (chunks.length !== 1) fail(`expected exactly 1 JS chunk, found ${chunks.length}`);

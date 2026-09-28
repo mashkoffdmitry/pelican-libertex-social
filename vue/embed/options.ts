@@ -44,6 +44,26 @@ const THEMES: readonly EmbedTheme[] = ['dark', 'light', 'auto'];
 const EXTRA_LINK_KEYS = new Set(['ref', 'partner', 'aff_id', 'sub_id', 'click_id', 'promo']);
 const LOCALE_RE = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/;
 
+/**
+ * A locale the component can actually use: toLocaleString() throws a
+ * RangeError for tags that pass a shape check but that Intl rejects
+ * (e.g. "en-12"), which would break every number cell. -> canonical tag | null.
+ */
+export function normLocale(v: string | null | undefined): string | null {
+  const s = String(v || '').trim();
+  if (!s || !LOCALE_RE.test(s)) return null;
+  try {
+    const canon = Intl.getCanonicalLocales(s)[0];
+    if (!canon) return null;
+    new Intl.NumberFormat(canon);
+    new Intl.DateTimeFormat(canon);
+    (1234.5).toLocaleString(canon);
+    return canon;
+  } catch {
+    return null;
+  }
+}
+
 export function warn(msg: string): void {
   try {
     console.warn('[LibertexSocialWidget] ' + msg);
@@ -169,7 +189,8 @@ export function resolveOptions(o: EmbedOptions): ResolvedOptions {
   if (o.lang && !normLang(o.lang)) warn(`unsupported lang "${o.lang}", using "${lang}"`);
   const theme = normTheme(o.theme) ?? 'dark';
   if (o.theme && !normTheme(o.theme)) warn(`unsupported theme "${o.theme}", using "dark"`);
-  const locale = o.locale && LOCALE_RE.test(o.locale.trim()) ? o.locale.trim() : 'en-US';
+  const locale = normLocale(o.locale) ?? 'en-US';
+  if (o.locale && !normLocale(o.locale)) warn(`unsupported locale "${o.locale}", using "en-US"`);
 
   let apiBase = DEFAULT_API_BASE;
   let catalogBase = DEFAULT_CATALOG_BASE;

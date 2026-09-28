@@ -1,7 +1,7 @@
 import { computed, onScopeDispose, ref, shallowRef, triggerRef, type Ref } from 'vue';
 import type { Strategy, HistoryPoint } from '../types/strategy';
 import type { ProgressResponse } from '../types/api';
-import { api, joinUrl, withTimeout, type PelicanError } from '../utils/http';
+import { api, joinUrl, makeError, withTimeout, type PelicanError } from '../utils/http';
 import { riskFromDrawdown } from '../utils/risk';
 import {
   LIVE_TIMEOUT_MS,
@@ -90,6 +90,13 @@ export function useCatalog({
       const url = partial ? '/api/strategies-full?partial=1' : '/api/strategies-full';
       const items = await api<Strategy[]>(url, catalogOrigin());
       if (gen !== generation) return;
+      // A 200 with a non-array body (error envelope, misconfigured edge) must
+      // surface as an error, not crash the render with total = undefined.
+      if (!Array.isArray(items)) throw makeError('http_error', 'bad catalog payload (not an array)');
+      // The edge serves only fully built catalogs: an empty one is an outage.
+      if (!items.length && !partial && isEdgeCatalog()) {
+        throw makeError('http_error', 'empty catalog from the edge');
+      }
       error.value = null;
       total.value = items.length;
       const m = byIdRef.value;

@@ -32,3 +32,13 @@ export function sanitizeLinkParams(raw: string | null | undefined): string {
   });
   return out.toString();
 }
+
+export const COPY_TRADE_ORIGIN = 'https://libertex.copy-trade.io';
+
+/**
+ * libertex.copy-trade.io URL for `path` ('/' or '/strategy/<id>') with the
+ * pre-sanitised `linkParams` query string appended (see sanitizeLinkParams).
+ */
+export function copyTradeUrl(path: string, qs: string | null | undefined): string {
+  return `${COPY_TRADE_ORIGIN}${path}${qs ? '?' + qs : ''}`;
+}

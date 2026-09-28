@@ -83,13 +83,14 @@ const en = {
   'sort.monthly-desc': 'Monthly Profit ↓',
   'sort.monthly-asc': 'Monthly Profit ↑',
 
-  // Table headers
+  // Table headers. Soft hyphens (U+00AD) let long words break inside the
+  // narrow (>= 70 px) sortable columns instead of overlapping the neighbour.
   'table.name': 'Name',
   'table.equityCurve': 'Equity curve',
   'table.return': 'Return %',
   'table.copiers': 'Copiers',
   'table.copiersAUM': 'Copiers AUM',
-  'table.maxDrawdown': 'Max Drawdown',
+  'table.maxDrawdown': 'Max Draw\u00ADdown',
   'table.age': 'Age',
   'table.balance': 'Balance',
   'table.mgmtFee': 'Mgmt Fee %',
@@ -231,13 +232,13 @@ const ru: Record<TranslationKey, string> = {
 
   'table.name': 'Название',
   'table.equityCurve': 'Кривая капитала',
-  'table.return': 'Доходность %',
-  'table.copiers': 'Копирующих',
-  'table.copiersAUM': 'AUM копирующих',
-  'table.maxDrawdown': 'Макс. просадка',
+  'table.return': 'Доход\u00ADность %',
+  'table.copiers': 'Копи\u00ADрующих',
+  'table.copiersAUM': 'AUM копи\u00ADрующих',
+  'table.maxDrawdown': 'Макс. про\u00ADсадка',
   'table.age': 'Возраст',
   'table.balance': 'Баланс',
-  'table.mgmtFee': 'Комиссия %',
+  'table.mgmtFee': 'Комис\u00ADсия %',
   'table.empty': 'Ничего не найдено.',
 
   'row.dataLabel.equityCurve': 'Кривая капитала',
@@ -366,13 +367,13 @@ const es: Record<TranslationKey, string> = {
 
   'table.name': 'Nombre',
   'table.equityCurve': 'Curva de capital',
-  'table.return': 'Rentabilidad %',
-  'table.copiers': 'Copiadores',
-  'table.copiersAUM': 'AUM de copiadores',
-  'table.maxDrawdown': 'Drawdown máx.',
-  'table.age': 'Antigüedad',
+  'table.return': 'Rentabi\u00ADlidad %',
+  'table.copiers': 'Copia\u00ADdores',
+  'table.copiersAUM': 'AUM de copia\u00ADdores',
+  'table.maxDrawdown': 'Draw\u00ADdown máx.',
+  'table.age': 'Antigüe\u00ADdad',
   'table.balance': 'Balance',
-  'table.mgmtFee': 'Comisión de gestión %',
+  'table.mgmtFee': 'Comi\u00ADsión de ges\u00ADtión %',
   'table.empty': 'Sin resultados.',
 
   'row.dataLabel.equityCurve': 'Curva de capital',

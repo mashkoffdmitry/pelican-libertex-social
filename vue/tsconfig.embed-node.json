@@ -1,0 +1,18 @@
+{
+  // Type-checks the embeddable widget's BUILD code (runs in Node, not in the
+  // browser): vite.embed.config.ts and embed/build/**. Part of build:embed.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "noEmit": true
+  },
+  "include": ["vite.embed.config.ts", "embed/build/**/*.ts"]
+}

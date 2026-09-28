@@ -16,6 +16,7 @@ import {
 } from '../utils/format';
 import { winrate } from '../utils/winrate';
 import { LOCALE_KEY, LINK_PARAMS_KEY } from '../injection-keys';
+import { copyTradeUrl } from '../utils/links';
 
 type TradesEntry = {
   loading: boolean;
@@ -46,10 +47,7 @@ const dd = computed(() => (props.s.MaxDD != null ? fmtPct(props.s.MaxDD, 2) : nu
 const age = computed(() => ageDays(props.s.Inception));
 const wr = computed(() => winrate(props.s));
 const lr = computed(() => (wr.value >= 0 ? 100 - wr.value : -1));
-const link = computed(() => {
-  const qs = linkParams?.value ?? '';
-  return `https://libertex.copy-trade.io/strategy/${props.s.Id}${qs ? '?' + qs : ''}`;
-});
+const link = computed(() => copyTradeUrl(`/strategy/${props.s.Id}`, linkParams?.value));
 const risk = computed(() => props.s.RiskProfile ?? 'Unsuitable');
 
 // Localised wrappers around format.ts helpers — those are language-agnostic and

@@ -25,14 +25,31 @@ jobs:
       - run: npm ci
       - run: npm run type-check
       - run: npm run build
-      # Embeddable widget (vue/dist-embed): the build fails if its CSS
-      # post-processing no longer matches the component exactly.
-      - run: npm run build:embed
       - uses: actions/upload-artifact@v4
         with:
           name: vue-dist
           path: vue/dist/
           retention-days: 7
+
+  embed:
+    name: vue/ embeddable widget build (informational)
+    # Self-contained widget for libertex.org / fxclub.org (vue/dist-embed),
+    # shipped by the corporate GitLab pipeline, not from here. Deliberately
+    # NOT listed in any deploy/publish job's `needs`: a red result here never
+    # blocks the proxy deploy or the npm publish.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vue/package-lock.json
+      - run: npm ci
+      - run: npm run build:embed
 
   proxy-syntax:
     name: proxy syntax check
