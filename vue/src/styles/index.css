@@ -46,6 +46,12 @@
   --glass-border:    rgba(255,255,255,.08);
   --glass-header-bg: rgba(20,23,28,.62);
   --glass-head-bg:   rgba(42,52,51,.50);
+
+  /* Used by ProgressBar.vue but were never defined, so a host page's :root
+     variables of the same name leaked in. Aliases resolve per theme. */
+  --line-2:  var(--border);
+  --orange:  var(--accent);
+  --muted-2: var(--fg-3);
 }
 
 .pelican-libsoc.theme-light {

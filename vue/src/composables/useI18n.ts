@@ -23,13 +23,26 @@ export interface I18nApi {
 
 export const I18N_KEY: InjectionKey<I18nApi> = Symbol('pelican.i18n');
 
+export interface ProvideI18nOptions {
+  /**
+   * Read/write the chosen language from/to localStorage. Default true.
+   * Embedders on third-party pages pass false so the widget neither reads
+   * nor leaves anything in the host's storage.
+   */
+  persist?: boolean;
+}
+
 // Mirrors the useTheme pattern: root component creates the reactive state and
 // provides it; descendants inject it via useI18n(). Locale persists in
-// localStorage under `pelican-lang`.
-export function provideI18n(initial: Lang = DEFAULT_LANG): I18nApi {
-  const lang = ref<Lang>(readStored() ?? initial);
+// localStorage under `pelican-lang` (unless `persist: false`).
+export function provideI18n(
+  initial: Lang = DEFAULT_LANG,
+  { persist = true }: ProvideI18nOptions = {},
+): I18nApi {
+  const lang = ref<Lang>((persist ? readStored() : null) ?? initial);
 
   watch(lang, (l) => {
+    if (!persist) return;
     try {
       localStorage.setItem(STORAGE_KEY, l);
     } catch {

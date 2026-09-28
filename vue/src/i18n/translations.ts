@@ -133,6 +133,7 @@ const en = {
   'tradesPanel.tradeHistory': 'Trade History (30d)',
   'tradesPanel.loading': 'Loading…',
   'tradesPanel.empty': 'No trades.',
+  'tradesPanel.error': 'Could not load trades.',
 
   // Pager
   'pager.prev': '‹ prev',
@@ -143,6 +144,11 @@ const en = {
   'progress.refreshing': 'Refreshing strategy data',
   'donut.empty': 'no market data',
   'spark.empty': 'no data',
+
+  // Catalog load states (shown in the table while empty)
+  'catalog.loading': 'Loading strategies…',
+  'catalog.unavailable': 'Strategies are temporarily unavailable. Please try again later.',
+  'common.retry': 'Retry',
 
   // fmtAge unit suffixes (kept short to fit the table column)
   'fmt.age.days': '{n}d',
@@ -267,6 +273,7 @@ const ru: Record<TranslationKey, string> = {
   'tradesPanel.tradeHistory': 'История сделок (30д)',
   'tradesPanel.loading': 'Загрузка…',
   'tradesPanel.empty': 'Сделок нет.',
+  'tradesPanel.error': 'Не удалось загрузить сделки.',
 
   'pager.prev': '‹ назад',
   'pager.next': 'вперёд ›',
@@ -275,6 +282,10 @@ const ru: Record<TranslationKey, string> = {
   'progress.refreshing': 'Обновление данных',
   'donut.empty': 'нет данных по рынкам',
   'spark.empty': 'нет данных',
+
+  'catalog.loading': 'Загрузка стратегий…',
+  'catalog.unavailable': 'Стратегии временно недоступны. Попробуйте позже.',
+  'common.retry': 'Повторить',
 
   'fmt.age.days': '{n} д',
   'fmt.age.months': '{n} мес',
@@ -397,6 +408,7 @@ const es: Record<TranslationKey, string> = {
   'tradesPanel.tradeHistory': 'Historial de operaciones (30d)',
   'tradesPanel.loading': 'Cargando…',
   'tradesPanel.empty': 'Sin operaciones.',
+  'tradesPanel.error': 'No se pudieron cargar las operaciones.',
 
   'pager.prev': '‹ anterior',
   'pager.next': 'siguiente ›',
@@ -405,6 +417,10 @@ const es: Record<TranslationKey, string> = {
   'progress.refreshing': 'Actualizando datos de estrategias',
   'donut.empty': 'sin datos de mercado',
   'spark.empty': 'sin datos',
+
+  'catalog.loading': 'Cargando estrategias…',
+  'catalog.unavailable': 'Las estrategias no están disponibles temporalmente. Inténtalo más tarde.',
+  'common.retry': 'Reintentar',
 
   'fmt.age.days': '{n} d',
   'fmt.age.months': '{n} m',

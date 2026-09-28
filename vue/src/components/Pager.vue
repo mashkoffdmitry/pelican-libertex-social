@@ -24,12 +24,12 @@ function onGoto(e: Event) {
 
 <template>
   <nav v-if="props.totalPages > 1" class="pelican-pager">
-    <button :disabled="page <= 1" @click="go('prev')">{{ t('pager.prev') }}</button>
+    <button type="button" :disabled="page <= 1" @click="go('prev')">{{ t('pager.prev') }}</button>
     <template v-for="(p, i) in range" :key="i">
       <span v-if="p === '…'" class="gap">…</span>
-      <button v-else class="page" :class="{ cur: p === page }" @click="go(p)">{{ p }}</button>
+      <button v-else type="button" class="page" :class="{ cur: p === page }" @click="go(p)">{{ p }}</button>
     </template>
-    <button :disabled="page >= totalPages" @click="go('next')">{{ t('pager.next') }}</button>
+    <button type="button" :disabled="page >= totalPages" @click="go('next')">{{ t('pager.next') }}</button>
     <span class="info">
       {{ t('pager.goto') }}
       <input type="number" :min="1" :max="totalPages" :value="page" @change="onGoto" />

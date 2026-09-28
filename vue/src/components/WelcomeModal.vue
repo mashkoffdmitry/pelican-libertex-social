@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from '../composables/useI18n';
+import { LOGO_SRC_KEY } from '../injection-keys';
 
 const { lang } = useI18n();
+const logoSrcRef = inject(LOGO_SRC_KEY, null);
+const logoSrc = computed(() => logoSrcRef?.value || '/logo.png');
 
 const DISMISS_KEY = 'pelican-welcome-dismissed-at';
 const SUPPRESS_MS = 30 * 60 * 1000;
@@ -78,20 +81,37 @@ const TEXT: Record<'en' | 'ru' | 'es', WelcomeText> = {
 
 const tx = computed<WelcomeText>(() => TEXT[lang.value] ?? TEXT.en);
 
+// Remember the host page's own body overflow and put it back on close,
+// instead of wiping it to '' (which could break a host that sets it).
+let prevOverflow: string | null = null;
 function lockScroll(on: boolean) {
-  try { document.body.style.overflow = on ? 'hidden' : ''; } catch { /* ignore */ }
+  try {
+    if (on) {
+      if (prevOverflow === null) prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    } else if (prevOverflow !== null) {
+      document.body.style.overflow = prevOverflow;
+      prevOverflow = null;
+    }
+  } catch { /* ignore */ }
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && open.value) dismiss();
 }
 
 function openModal() {
   videoSrc.value = YT[lang.value] ?? YT.en;
   open.value = true;
   lockScroll(true);
+  try { document.addEventListener('keydown', onKeydown); } catch { /* ignore */ }
 }
 
 function dismiss() {
   open.value = false;
   videoSrc.value = '';
   lockScroll(false);
+  try { document.removeEventListener('keydown', onKeydown); } catch { /* ignore */ }
   try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* ignore */ }
 }
 
@@ -99,6 +119,13 @@ onMounted(() => {
   let last = 0;
   try { last = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10); } catch { /* ignore */ }
   if (Date.now() - last >= SUPPRESS_MS) openModal();
+});
+
+// Unmounted while open (e.g. host SPA navigates away): release the scroll lock
+// and the Esc listener without recording a dismissal.
+onBeforeUnmount(() => {
+  lockScroll(false);
+  try { document.removeEventListener('keydown', onKeydown); } catch { /* ignore */ }
 });
 
 // keep the video language in sync if the user switches language while open
@@ -114,7 +141,7 @@ watch(lang, (l) => {
       <button class="welcome-close" type="button" :aria-label="tx.close" @click="dismiss">×</button>
 
       <div class="welcome-brand">
-        <span class="welcome-logo-tile" aria-hidden="true"><img :src="'/logo.png'" alt="" /></span>
+        <span class="welcome-logo-tile" aria-hidden="true"><img :src="logoSrc" alt="" /></span>
         <span class="welcome-brand-text">
           <span class="welcome-brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>
           <span class="welcome-brand-sub">{{ tx.sub }}</span>
