@@ -52,6 +52,24 @@
   .pel-embed .brand-row { padding-left: 20px; padding-right: 20px; }
 }
 
+/* The header row with labels is 350 px wide after the 20 px left padding, so
+   it fits a 375 px container (a phone on libertex.org, zero gutters) as
+   before. Hosts with side gutters are narrower (fxclub.org .container keeps
+   20 px each side: a 335 px widget on a 375 px phone) and overflow-x: clip
+   used to cut the Light button. There, keep the moon/sun icons only (the
+   component's own icon-only look; both buttons keep their aria-label). */
+@container (max-width: 374px) {
+  .pel-embed .theme-seg .seg-label { display: none; }
+}
+
+/* The icon-only row still needs 288 px + 2 x 20 px padding. Narrower hosts
+   (a 320 px phone with page gutters) move the theme switch to a second line,
+   right-aligned under EN/RU, instead of clipping it. */
+@container (max-width: 327px) {
+  .pel-embed .brand-row { flex-wrap: wrap; row-gap: 10px; }
+  .pel-embed .brand-row .theme-seg { margin-left: auto; }
+}
+
 /* Background blobs, bundled as WebP (the component's url('/bg-blob*.png')
    is rewritten to none at build time: it would hit the host's origin). */
 .pel-embed .pelican-libsoc::before { background-image: url(./assets/bg-blob.webp); }
