@@ -215,6 +215,10 @@ function toggleClosed() {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.nm {
+  min-width: 0;
 }
 .avatar {
   position: relative;
@@ -240,6 +244,8 @@ function toggleClosed() {
 .title {
   font-weight: 600;
   color: var(--fg);
+  /* long names without spaces ("t.me/DraykonCapital") must not run into the sparkline */
+  overflow-wrap: anywhere;
 }
 .free-badge {
   margin-left: 6px;

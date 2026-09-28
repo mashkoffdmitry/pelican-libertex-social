@@ -130,11 +130,23 @@ export function initFrameParent(scriptOrigin: string | null, version: string): v
     const origin = frameOrigin(f);
     if (!origin || !f.contentWindow) return;
     try {
-      // targetOrigin: dropped silently while the frame is still about:blank
       f.contentWindow.postMessage({ type: T_HELLO, version }, origin);
     } catch {
       /* ignore */
     }
+  };
+  // A frame that is still the initial about:blank has the parent's origin, so a
+  // hello with the frame's targetOrigin would only log a console warning. Wait
+  // for its load; a cross-origin (already loaded) frame throws on location read.
+  const helloWhenLoaded = (f: HTMLIFrameElement) => {
+    let blank = false;
+    try {
+      blank = !f.contentWindow || f.contentWindow.location.href === 'about:blank';
+    } catch {
+      blank = false;
+    }
+    if (blank) f.addEventListener('load', () => hello(f), { once: true });
+    else hello(f);
   };
 
   window.addEventListener('message', (e: MessageEvent) => {
@@ -159,5 +171,5 @@ export function initFrameParent(scriptOrigin: string | null, version: string): v
   });
 
   // The helper may load after the frame already gave up retrying.
-  findFrames(scriptOrigin).forEach(hello);
+  findFrames(scriptOrigin).forEach(helloWhenLoaded);
 }
