@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, provide, reactive, ref, toRef, watch } from 'vue';
+import { computed, onMounted, provide, reactive, ref, toRef, watch } from 'vue';
 import Toolbar from './components/Toolbar.vue';
 import FiltersPanel from './components/FiltersPanel.vue';
 import StrategyTable from './components/StrategyTable.vue';
@@ -22,7 +22,14 @@ import type { SignalKind } from './types/api';
 import type { PelicanError } from './utils/http';
 import type { SortKey, SortColumn } from './constants/sort';
 import { PAGE_SIZE } from './constants/defaults';
-import { LOCALE_KEY, API_BASE_KEY, CATALOG_BASE_KEY } from './injection-keys';
+import {
+  LOCALE_KEY,
+  API_BASE_KEY,
+  CATALOG_BASE_KEY,
+  LOGO_SRC_KEY,
+  LINK_PARAMS_KEY,
+} from './injection-keys';
+import { copyTradeUrl, sanitizeLinkParams } from './utils/links';
 import ThemeToggle from './components/ThemeToggle.vue';
 import './styles/index.css';
 
@@ -53,6 +60,24 @@ const props = withDefaults(
      * steps). Off by default: an embedded catalog widget does not need it.
      */
     welcome?: boolean;
+    /** Logo image URL for the header (and welcome modal). */
+    logoSrc?: string;
+    /**
+     * Extra query params appended to every libertex.copy-trade.io link, e.g.
+     * "utm_source=libertex.org&utm_medium=widget". Sanitised: only plain
+     * keys, re-encoded; a leading '?' is allowed.
+     */
+    linkParams?: string;
+    /**
+     * Remember the theme/language choice in localStorage (and read it back on
+     * load). Embedders on third-party pages can turn it off.
+     */
+    persist?: boolean;
+    /**
+     * With a separate `catalogBase`: also fetch the catalog progress endpoint
+     * (only feeds `builtAt`, which the UI does not show).
+     */
+    fetchProgress?: boolean;
   }>(),
   {
     theme: 'auto',
@@ -61,6 +86,10 @@ const props = withDefaults(
     locale: 'en-US',
     pageSize: PAGE_SIZE,
     welcome: false,
+    logoSrc: '/logo.png',
+    linkParams: '',
+    persist: true,
+    fetchProgress: true,
   },
 );
 
@@ -68,24 +97,31 @@ const emit = defineEmits<{
   (e: 'update:theme', m: ThemeMode): void;
   (e: 'update:lang', l: Lang): void;
   (e: 'select-strategy', s: Strategy): void;
+  /** Only when a row gets expanded (select-strategy fires on every toggle). */
+  (e: 'expand-strategy', s: Strategy): void;
   (e: 'error', err: PelicanError): void;
 }>();
 
 provide(API_BASE_KEY, props.apiBase);
 provide(CATALOG_BASE_KEY, props.catalogBase ?? props.apiBase);
 provide(LOCALE_KEY, props.locale);
+provide(LOGO_SRC_KEY, toRef(props, 'logoSrc'));
+const linkQs = computed(() => sanitizeLinkParams(props.linkParams));
+provide(LINK_PARAMS_KEY, linkQs);
+// Header logo link carries the same params as the strategy links.
+const brandHref = computed(() => copyTradeUrl('/', linkQs.value));
 
 const apiBaseRef = toRef(props, 'apiBase');
 const catalogBaseRef = toRef(props, 'catalogBase');
 
-const themeApi = useTheme(props.theme);
+const themeApi = useTheme(props.theme, { persist: props.persist });
 watch(themeApi.mode, (m) => emit('update:theme', m));
 watch(
   () => props.theme,
   (t) => themeApi.setMode(t),
 );
 
-const i18n = provideI18n(props.lang);
+const i18n = provideI18n(props.lang, { persist: props.persist });
 watch(i18n.lang, (l) => emit('update:lang', l));
 watch(
   () => props.lang,
@@ -96,6 +132,7 @@ const t = i18n.t;
 const catalog = useCatalog({
   apiBase: apiBaseRef,
   catalogBase: catalogBaseRef,
+  fetchProgress: toRef(props, 'fetchProgress'),
   onError: (e) => emit('error', e),
 });
 
@@ -106,7 +143,12 @@ const pagination = usePagination<Strategy>(sortApi.sorted, props.pageSize);
 const signals = useSignals(apiBaseRef);
 
 watch(pagination.pageItems, (items) => {
-  items.forEach((s) => { if (!s.History?.length) void catalog.enrichOne(s.Id); });
+  // Rows without History get ONE enrich attempt; many strategies have none
+  // even after enrich, so skipping attempted rows is what ends the cycle
+  // (enrich -> catalog change -> new pageItems -> enrich ...).
+  items.forEach((s) => {
+    if (!s._enrichAttempted && !s.History?.length) void catalog.enrichOne(s.Id);
+  });
 }, { immediate: true });
 
 const expanded = reactive(new Set<number>());
@@ -123,6 +165,7 @@ function toggleRow(id: number) {
   } else {
     expanded.clear();
     expanded.add(id);
+    emit('expand-strategy', s);
   }
 }
 
@@ -161,8 +204,8 @@ onMounted(() => catalog.start());
   <div class="pelican-libsoc" :class="`theme-${themeApi.resolved.value}`">
     <header class="brand-row">
         <slot name="brand">
-          <a class="brand" href="https://libertex.copy-trade.io/" target="_blank" rel="noopener">
-            <span class="logo-tile"><img :src="'/logo.png'" alt="" /></span>
+          <a class="brand" :href="brandHref" target="_blank" rel="noopener">
+            <span class="logo-tile"><img :src="logoSrc" alt="" /></span>
             <span class="brand-text">
               <span class="brand-name"><span>LIBERTEX</span><span>SOCIAL</span></span>
               <span class="brand-sub">Copy Trading</span>
@@ -223,7 +266,20 @@ onMounted(() => catalog.start());
           @go="onPageGo"
         >
           <template #empty>
-            <slot name="empty">{{ t('table.empty') }}</slot>
+            <div
+              v-if="catalog.error.value && !catalog.catalog.value.length"
+              class="catalog-state"
+              role="alert"
+            >
+              <span>{{ t('catalog.unavailable') }}</span>
+              <button class="catalog-retry" type="button" @click="catalog.refresh">
+                {{ t('common.retry') }}
+              </button>
+            </div>
+            <div v-else-if="!catalog.ready.value" class="catalog-state" role="status">
+              {{ t('catalog.loading') }}
+            </div>
+            <slot v-else name="empty">{{ t('table.empty') }}</slot>
           </template>
           <template #row-actions="slotProps">
             <slot name="row-actions" v-bind="slotProps" />
@@ -333,6 +389,28 @@ onMounted(() => catalog.start());
   max-width: 1640px;
   margin: 0 auto;
   align-items: start;
+}
+.catalog-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.catalog-retry {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.catalog-retry:hover {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
 }
 @media (max-width: 980px) {
   .pelican-main {

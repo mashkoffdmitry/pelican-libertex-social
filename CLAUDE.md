@@ -26,7 +26,7 @@ artifacts:
 | `vue/` | Vue 3 SFC + Vite library mode. Built into the proxy image and served at `/widget/*` (the demo page uses it); also published as `@mashkovd/pelican-vue` on npmjs for external installs. Decoupled SemVer from the proxy. |
 | `worker/` | Cloudflare Worker — `GET /api/strategies-full(/progress)` from R2 bucket `pelican-catalog`, `POST /__ingest` for proxy pushes. Deployed by CI on push to `main` when `worker/**` changed, markdown excluded (job `deploy-worker`, secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`); manual fallback `cd worker && npx wrangler deploy`. |
 | `r2-uploader.js` | After each `buildFull()`, server.js POSTs the catalog (gzipped) to the Worker if `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` are set; else skips silently. |
-| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` (always), `docker` (PR-only gate), `deploy`, `deploy-worker` and `publish-vue` (push-to-main only; npm via trusted publishing, no token), `deploy-staging`, `preview`. |
+| `.github/workflows/ci.yml` | `vue` + `proxy-syntax` + `worker` + `embed` (always; `embed` = informational widget build, nothing depends on it), `docker` (PR-only gate), `deploy`, `deploy-worker` and `publish-vue` (push-to-main only; npm via trusted publishing, no token), `deploy-staging`, `preview`. |
 | `.env` | Gitignored, mode 600. Holds `LIBERTEX_EMAIL`, `LIBERTEX_PASSWORD`, `INGEST_SECRET`, plus runtime tokens. Optionally `CATALOG_INGEST_URL` + `CATALOG_INGEST_SECRET` for Worker push. |
 
 ## Production

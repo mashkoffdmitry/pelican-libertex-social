@@ -10,8 +10,16 @@ export interface UseThemeReturn {
   cycle(): void;
 }
 
-export function useTheme(initial: ThemeMode = 'auto'): UseThemeReturn {
-  const stored = readStored();
+export interface UseThemeOptions {
+  /** Read/write the theme mode from/to localStorage. Default true. */
+  persist?: boolean;
+}
+
+export function useTheme(
+  initial: ThemeMode = 'auto',
+  { persist = true }: UseThemeOptions = {},
+): UseThemeReturn {
+  const stored = persist ? readStored() : null;
   const mode = ref<ThemeMode>(stored ?? initial);
   const resolved = ref<'dark' | 'light'>('dark');
   const mq = typeof window !== 'undefined' && window.matchMedia
@@ -38,10 +46,12 @@ export function useTheme(initial: ThemeMode = 'auto'): UseThemeReturn {
   }
 
   watch(mode, (m) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, m);
-    } catch {
-      /* storage unavailable */
+    if (persist) {
+      try {
+        localStorage.setItem(STORAGE_KEY, m);
+      } catch {
+        /* storage unavailable */
+      }
     }
     apply();
   });

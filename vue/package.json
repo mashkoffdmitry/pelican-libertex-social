@@ -1,6 +1,6 @@
 {
   "name": "@mashkovd/pelican-vue",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "type": "module",
   "license": "MIT",
   "description": "Vue 3 component for browsing Libertex Social copy-trading strategies via a pelican-libertex-social proxy.",
@@ -29,12 +29,15 @@
     "dev": "vite",
     "build": "vue-tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
-    "type-check": "vue-tsc -p tsconfig.json --noEmit"
+    "type-check": "vue-tsc -p tsconfig.json --noEmit",
+    "build:embed": "vue-tsc -p tsconfig.embed.json --noEmit && vue-tsc -p tsconfig.embed-node.json --noEmit && vite build --config vite.embed.config.ts",
+    "preview:embed": "vite preview --config vite.embed.config.ts --port 4180"
   },
   "peerDependencies": {
     "vue": "^3.4.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.4",
     "@vitejs/plugin-vue": "^5.0.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",

@@ -15,13 +15,20 @@ import {
   initials,
 } from '../utils/format';
 import { winrate } from '../utils/winrate';
-import { LOCALE_KEY } from '../injection-keys';
+import { LOCALE_KEY, LINK_PARAMS_KEY } from '../injection-keys';
+import { copyTradeUrl } from '../utils/links';
+
+type TradesEntry = {
+  loading: boolean;
+  trades: import('../types/strategy').Trade[] | null;
+  error?: unknown;
+};
 
 const props = defineProps<{
   s: Strategy;
   expanded: boolean;
-  openTrades: { loading: boolean; trades: import('../types/strategy').Trade[] | null } | null;
-  closedTrades: { loading: boolean; trades: import('../types/strategy').Trade[] | null } | null;
+  openTrades: TradesEntry | null;
+  closedTrades: TradesEntry | null;
 }>();
 
 const emit = defineEmits<{
@@ -31,6 +38,8 @@ const emit = defineEmits<{
 }>();
 
 const locale = inject(LOCALE_KEY, 'en-US');
+// Pre-sanitised query string (no leading '?'), e.g. "utm_source=site".
+const linkParams = inject(LINK_PARAMS_KEY, null);
 const { t } = useI18n();
 
 const ret = computed(() => fmtPct(props.s.Return, 1));
@@ -38,7 +47,7 @@ const dd = computed(() => (props.s.MaxDD != null ? fmtPct(props.s.MaxDD, 2) : nu
 const age = computed(() => ageDays(props.s.Inception));
 const wr = computed(() => winrate(props.s));
 const lr = computed(() => (wr.value >= 0 ? 100 - wr.value : -1));
-const link = computed(() => `https://libertex.copy-trade.io/strategy/${props.s.Id}`);
+const link = computed(() => copyTradeUrl(`/strategy/${props.s.Id}`, linkParams?.value));
 const risk = computed(() => props.s.RiskProfile ?? 'Unsuitable');
 
 // Localised wrappers around format.ts helpers — those are language-agnostic and
@@ -68,13 +77,15 @@ function pnlClass(v: number | null | undefined): string {
 const showOpen = ref(false);
 const showClosed = ref(false);
 
+// (Re)load when the panel opens and there is nothing cached yet or the last
+// attempt failed; the panel's Retry button does the same while it is open.
 function toggleOpen() {
   showOpen.value = !showOpen.value;
-  if (showOpen.value && !props.openTrades) emit('load-trades', 'open');
+  if (showOpen.value && (!props.openTrades || props.openTrades.error)) emit('load-trades', 'open');
 }
 function toggleClosed() {
   showClosed.value = !showClosed.value;
-  if (showClosed.value && !props.closedTrades) emit('load-trades', 'closed');
+  if (showClosed.value && (!props.closedTrades || props.closedTrades.error)) emit('load-trades', 'closed');
 }
 </script>
 
@@ -166,14 +177,18 @@ function toggleClosed() {
       kind="open"
       :trades="openTrades?.trades ?? null"
       :loading="!!openTrades?.loading"
+      :error="!!openTrades?.error"
       :locale="locale"
+      @retry="emit('load-trades', 'open')"
     />
     <TradesPanel
       v-if="showClosed"
       kind="closed"
       :trades="closedTrades?.trades ?? null"
       :loading="!!closedTrades?.loading"
+      :error="!!closedTrades?.error"
       :locale="locale"
+      @retry="emit('load-trades', 'closed')"
     />
   </div>
 </template>
@@ -200,6 +215,10 @@ function toggleClosed() {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.nm {
+  min-width: 0;
 }
 .avatar {
   position: relative;
@@ -225,6 +244,8 @@ function toggleClosed() {
 .title {
   font-weight: 600;
   color: var(--fg);
+  /* long names without spaces ("t.me/DraykonCapital") must not run into the sparkline */
+  overflow-wrap: anywhere;
 }
 .free-badge {
   margin-left: 6px;

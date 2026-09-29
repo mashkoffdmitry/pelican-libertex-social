@@ -10,6 +10,12 @@ const props = defineProps<{
   trades: Trade[] | null;
   loading: boolean;
   locale: string;
+  /** Last load failed — show an error with a Retry button instead of "No trades". */
+  error?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'retry'): void;
 }>();
 
 const { t } = useI18n();
@@ -18,7 +24,7 @@ const title = computed(() =>
   props.kind === 'open' ? t('tradesPanel.openTrades') : t('tradesPanel.tradeHistory'),
 );
 const empty = computed(
-  () => !props.loading && (props.trades == null || props.trades.length === 0),
+  () => !props.loading && !props.error && (props.trades == null || props.trades.length === 0),
 );
 
 function fmtPrice(v: number | null | undefined): string {
@@ -54,6 +60,10 @@ const rows = computed(() => {
   <div class="pelican-trades">
     <div class="hd">{{ title }}</div>
     <div v-if="loading" class="dim">{{ t('tradesPanel.loading') }}</div>
+    <div v-else-if="error" class="dim err">
+      {{ t('tradesPanel.error') }}
+      <button class="retry" type="button" @click.stop="emit('retry')">{{ t('common.retry') }}</button>
+    </div>
     <div v-else-if="empty" class="dim">{{ t('tradesPanel.empty') }}</div>
     <ul v-else class="list">
       <li v-for="(r, i) in rows" :key="i" class="trade">
@@ -155,4 +165,22 @@ const rows = computed(() => {
 .green { color: var(--up); }
 .red { color: var(--down); }
 .dim { color: var(--fg-3); }
+.err {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.retry {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.retry:hover { background: var(--accent); color: var(--accent-fg); }
 </style>

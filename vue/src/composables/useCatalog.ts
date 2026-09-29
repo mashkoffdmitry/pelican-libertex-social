@@ -1,9 +1,10 @@
 import { computed, onScopeDispose, ref, shallowRef, triggerRef, type Ref } from 'vue';
 import type { Strategy, HistoryPoint } from '../types/strategy';
 import type { ProgressResponse } from '../types/api';
-import { api, joinUrl, type PelicanError } from '../utils/http';
+import { api, joinUrl, makeError, withTimeout, type PelicanError } from '../utils/http';
 import { riskFromDrawdown } from '../utils/risk';
 import {
+  LIVE_TIMEOUT_MS,
   PARTIAL_REPAINT_INTERVAL_MS,
   PROGRESS_POLL_INTERVAL_MS,
 } from '../constants/defaults';
@@ -23,6 +24,12 @@ export interface UseCatalogOptions {
    * If omitted, all endpoints — including catalog — go through `apiBase`.
    */
   catalogBase?: Ref<string | undefined>;
+  /**
+   * Edge-catalog mode only: also fetch `/api/strategies-full/progress` after
+   * the catalog (to expose `builtAt`). Default true. The widget turns it off
+   * to save a request — `builtAt` is not rendered anywhere.
+   */
+  fetchProgress?: Ref<boolean>;
   onError?(err: PelicanError): void;
 }
 
@@ -33,6 +40,8 @@ export interface UseCatalogReturn {
   loaded: Ref<number>;
   total: Ref<number>;
   builtAt: Ref<number | null>;
+  /** Last catalog load error (null once a catalog request succeeds / on refresh). */
+  error: Ref<PelicanError | null>;
   enrichOne(id: number): Promise<void>;
   searchExtra(filter: string): Promise<void>;
   refresh(): Promise<void>;
@@ -40,17 +49,26 @@ export interface UseCatalogReturn {
   stop(): void;
 }
 
-export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions): UseCatalogReturn {
+export function useCatalog({
+  apiBase,
+  catalogBase,
+  fetchProgress,
+  onError,
+}: UseCatalogOptions): UseCatalogReturn {
   const byIdRef = shallowRef<Map<number, Strategy>>(new Map());
   const ready = ref(false);
   const building = ref(false);
   const loaded = ref(0);
   const total = ref(0);
   const builtAt = ref<number | null>(null);
+  const error = ref<PelicanError | null>(null);
 
   const catalog = computed<Strategy[]>(() => Array.from(byIdRef.value.values()));
 
   let stopped = false;
+  // Bumped on every start(): a load loop from a previous start() (e.g. before
+  // refresh()) sees a different generation and exits instead of running on.
+  let generation = 0;
 
   const handleError = (e: unknown) => {
     if (onError) onError(e as PelicanError);
@@ -67,10 +85,19 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
   };
   const catalogOrigin = () => catalogBase?.value || apiBase.value;
 
-  async function fetchAndMerge(partial: boolean) {
+  async function fetchAndMerge(partial: boolean, gen: number) {
     try {
       const url = partial ? '/api/strategies-full?partial=1' : '/api/strategies-full';
       const items = await api<Strategy[]>(url, catalogOrigin());
+      if (gen !== generation) return;
+      // A 200 with a non-array body (error envelope, misconfigured edge) must
+      // surface as an error, not crash the render with total = undefined.
+      if (!Array.isArray(items)) throw makeError('http_error', 'bad catalog payload (not an array)');
+      // The edge serves only fully built catalogs: an empty one is an outage.
+      if (!items.length && !partial && isEdgeCatalog()) {
+        throw makeError('http_error', 'empty catalog from the edge');
+      }
+      error.value = null;
       total.value = items.length;
       const m = byIdRef.value;
       for (const it of items) {
@@ -81,6 +108,8 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
       }
       triggerRef(byIdRef);
     } catch (e) {
+      if (gen !== generation) return;
+      error.value = e as PelicanError;
       handleError(e);
     }
   }
@@ -99,32 +128,36 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
     }
   }
 
-  async function loadFull() {
+  async function loadFull(gen: number) {
+    const live = () => !stopped && gen === generation;
     if (isEdgeCatalog()) {
       // Single fetch — the edge catalog is always ready; no partial/polling.
-      await fetchAndMerge(false);
+      await fetchAndMerge(false, gen);
+      if (gen !== generation) return;
       // Best-effort progress fetch so callers can read built_at; failures are non-fatal.
-      void pollProgress();
+      if (fetchProgress?.value !== false) void pollProgress();
       ready.value = true;
       return;
     }
-    await fetchAndMerge(true);
+    await fetchAndMerge(true, gen);
     let lastPaint = Date.now();
-    while (!stopped) {
+    while (live()) {
       const p = await pollProgress();
       if (!p) {
         await sleep(1500);
         continue;
       }
       if (p.ready) break;
+      if (!live()) return;
       if (Date.now() - lastPaint > PARTIAL_REPAINT_INTERVAL_MS) {
-        await fetchAndMerge(true);
+        await fetchAndMerge(true, gen);
         lastPaint = Date.now();
       }
       await sleep(PROGRESS_POLL_INTERVAL_MS);
     }
-    if (stopped) return;
-    await fetchAndMerge(false);
+    if (!live()) return;
+    await fetchAndMerge(false, gen);
+    if (gen !== generation) return;
     ready.value = true;
   }
 
@@ -132,14 +165,21 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
   async function enrichOne(id: number) {
     if (enrichInflight.has(id)) return;
     const existing = byIdRef.value.get(id);
-    if (existing?._enrichAttempted && existing._meta && existing._stats && existing.History?.length) return;
+    // One attempt per strategy per catalog load. Many strategies legitimately
+    // have no History (e.g. new ones) — requiring History here re-triggered
+    // enrich on every catalog change and looped forever (~140 req/s).
+    if (existing?._enrichAttempted) return;
     enrichInflight.add(id);
+    const startMap = byIdRef.value;
     try {
       const [meta, stats] = await Promise.all([
         safeFetchJson<MetaResponse>(joinUrl(apiBase.value, `/api/strategies/${id}`)),
         safeFetchJson<StatsResponse>(joinUrl(apiBase.value, `/api/strategies/${id}/stats`)),
       ]);
       const m = byIdRef.value;
+      // Catalog was reset (refresh) while we were fetching — drop the result
+      // instead of injecting a stub row into the new catalog.
+      if (m !== startMap) return;
       const cur = m.get(id) ?? ({ Id: id } as Strategy);
       mergeMetaInto(cur, meta);
       mergeStatsInto(cur, stats);
@@ -181,7 +221,7 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
 
   function start() {
     stopped = false;
-    void loadFull();
+    void loadFull(++generation);
   }
   function stop() {
     stopped = true;
@@ -193,6 +233,7 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
     loaded.value = 0;
     total.value = 0;
     builtAt.value = null;
+    error.value = null;
     start();
   }
 
@@ -205,6 +246,7 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
     loaded,
     total,
     builtAt,
+    error,
     enrichOne,
     searchExtra,
     refresh,
@@ -215,9 +257,11 @@ export function useCatalog({ apiBase, catalogBase, onError }: UseCatalogOptions)
 
 async function safeFetchJson<T = unknown>(url: string): Promise<T | null> {
   try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    return (await r.json()) as T;
+    return await withTimeout(LIVE_TIMEOUT_MS, async (signal) => {
+      const r = await fetch(url, signal ? { signal } : undefined);
+      if (!r.ok) return null;
+      return (await r.json()) as T;
+    });
   } catch {
     return null;
   }

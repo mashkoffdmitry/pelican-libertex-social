@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Libertex Social widget - QA demo</title>
+<link rel="icon" href="data:,">
+<style>
+  /* Demo chrome only. Everything is prefixed .qa- so the optional host CSS
+     (demo-hosts/*.css) is the only "foreign" CSS on the page. */
+  .qa-bar{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;
+    padding:10px 16px;background:#20242b;color:#e8e8e8;font:13px/1.4 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .qa-bar label{display:inline-flex;gap:6px;align-items:center}
+  .qa-bar select{font:inherit;padding:2px 4px;color:#111;background:#fff;border:1px solid #888;border-radius:3px;height:auto;width:auto;margin:0;-webkit-appearance:auto;appearance:auto}
+  .qa-bar b{color:#ff8a55}
+  .qa-hero{padding:40px 16px;max-width:1216px;margin:0 auto}
+  .qa-hero h1{margin:0 0 8px}
+  .qa-col{margin:0 auto;padding:0 0 40px}
+  .qa-sec{margin:0 auto 40px}
+  .qa-sec > .qa-h{font:600 14px/1.4 system-ui,sans-serif;padding:8px 0;color:#888}
+  .qa-log{position:fixed;right:8px;bottom:8px;z-index:60;width:360px;max-height:180px;overflow:auto;margin:0;padding:8px;
+    background:rgba(20,20,20,.88);color:#9fe29f;font:11px/1.35 ui-monospace,monospace;border-radius:6px;white-space:pre-wrap}
+  .qa-foot{padding:60px 16px;text-align:center;color:#888}
+</style>
+<link id="qa-host-css" rel="stylesheet" disabled>
+</head>
+<body>
+<div class="qa-bar">
+  <b>pelican-widget QA</b>
+  <label>embed
+    <select id="qa-mode">
+      <option value="all">all: script EN + script RU + iframe RU</option>
+      <option value="en">script EN (libertex.org)</option>
+      <option value="ru">script RU (fxclub.org)</option>
+      <option value="frame">iframe fallback RU</option>
+      <option value="frame-bare">iframe without data attribute</option>
+    </select></label>
+  <label>host CSS
+    <select id="qa-host">
+      <option value="">none</option>
+      <option value="libertex-org">libertex.org (trimmed)</option>
+      <option value="fxclub-org">fxclub.org (trimmed)</option>
+    </select></label>
+  <label>column
+    <select id="qa-width">
+      <option value="">100%</option>
+      <option value="1440">1440</option>
+      <option value="1216">1216 (libertex.org)</option>
+      <option value="1072">1072 (fxclub.org)</option>
+      <option value="768">768</option>
+      <option value="375">375</option>
+    </select></label>
+  <label>theme
+    <select id="qa-theme"><option>dark</option><option>light</option><option>auto</option></select></label>
+  <label>blobs
+    <select id="qa-blobs"><option>on</option><option>off</option></select></label>
+  <label>lazy
+    <select id="qa-lazy"><option>on</option><option>off</option></select></label>
+  <span id="qa-ver"></span>
+</div>
+
+<div class="qa-hero">
+  <h1>Social trading</h1>
+  <p>Host page content above the widget. The catalog below is the embeddable build
+     (<code>pelican-widget.js</code>); switch the host CSS to check isolation.</p>
+</div>
+
+<div class="qa-col" id="qa-col"></div>
+<div class="qa-foot">Host page footer</div>
+<pre class="qa-log" id="qa-log"></pre>
+
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var st = {
+    mode: q.get('mode') || 'all', host: q.get('host') || '', width: q.get('width') || '',
+    theme: q.get('theme') || 'dark', blobs: q.get('blobs') || 'on', lazy: q.get('lazy') || 'on'
+  };
+  ['mode', 'host', 'width', 'theme', 'blobs', 'lazy'].forEach(function (k) {
+    var el = document.getElementById('qa-' + k);
+    el.value = st[k];
+    el.addEventListener('change', function () { q.set(k, el.value); location.search = q.toString(); });
+  });
+  if (st.host) {
+    var l = document.getElementById('qa-host-css');
+    l.href = 'demo-hosts/' + st.host + '.css';
+    l.disabled = false;
+  }
+  var col = document.getElementById('qa-col');
+  if (st.width) col.style.maxWidth = st.width + 'px';
+
+  function sec(title) {
+    var s = document.createElement('section');
+    s.className = 'qa-sec';
+    var h = document.createElement('div');
+    h.className = 'qa-h';
+    h.textContent = title;
+    s.appendChild(h);
+    col.appendChild(s);
+    return s;
+  }
+  function scriptEmbed(lang, site) {
+    var s = sec('script embed, data-lang="' + lang + '" (' + site + ')');
+    var d = document.createElement('div');
+    d.setAttribute('data-libertex-social-catalog', '');
+    d.setAttribute('data-lang', lang);
+    d.setAttribute('data-theme', st.theme);
+    d.setAttribute('data-blobs', st.blobs);
+    d.setAttribute('data-lazy', st.lazy);
+    d.setAttribute('data-link-params', 'utm_source=' + site + '&utm_medium=widget&utm_campaign=social_trading_catalog&evil=1');
+    var a = document.createElement('a');
+    a.href = 'https://libertex.copy-trade.io/';
+    a.textContent = 'Libertex Social: copy trading strategies';
+    d.appendChild(a);
+    s.appendChild(d);
+  }
+  function frameEmbed(lang, bare) {
+    var s = sec('iframe fallback, lang=' + lang + (bare ? ' (no data-libertex-social-frame attribute)' : ''));
+    var f = document.createElement('iframe');
+    if (!bare) f.setAttribute('data-libertex-social-frame', '');
+    f.title = 'Libertex Social';
+    f.loading = 'lazy';
+    f.src = 'frame.html?lang=' + lang + '&theme=' + st.theme + '&blobs=' + st.blobs +
+      '&utm_source=demo&utm_medium=widget&apiBase=https://evil.example';
+    f.style.cssText = 'display:block;width:100%;height:1600px;border:0';
+    s.appendChild(f);
+  }
+  if (st.mode === 'all' || st.mode === 'en') scriptEmbed('en', 'libertex.org');
+  if (st.mode === 'all' || st.mode === 'ru') scriptEmbed('ru', 'fxclub.org');
+  if (st.mode === 'all' || st.mode === 'frame') frameEmbed('ru', false);
+  if (st.mode === 'frame-bare') frameEmbed('ru', true);
+
+  var log = document.getElementById('qa-log');
+  function line(t) { log.textContent = (t + '\n' + log.textContent).slice(0, 4000); }
+  ['ready', 'error', 'strategy-open', 'subscribe-click', 'brand-click'].forEach(function (n) {
+    document.addEventListener('libertex-social:' + n, function (e) {
+      line('event ' + n + ' ' + JSON.stringify(e.detail));
+    });
+  });
+  window.dataLayer = window.dataLayer || [];
+  var push = window.dataLayer.push;
+  window.dataLayer.push = function (o) { line('dataLayer ' + JSON.stringify(o)); return push.apply(this, arguments); };
+  window.addEventListener('load', function () {
+    var w = window.LibertexSocialWidget;
+    document.getElementById('qa-ver').textContent = w ? 'v' + w.version + ' (component ' + w.componentVersion + ')' : 'widget NOT loaded';
+  });
+})();
+</script>
+<script src="./pelican-widget.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+/* Embed-only layer, appended AFTER the component CSS inside the shadow root.
+   Everything is scoped to .pel-embed (the .pel-root wrapper) or :host, so the
+   npm lib build and the proxy's own page are untouched.
+   The build post-processor (embed/build/plugin.ts) rewrites and counts
+   patterns in the COMPONENT css only; this file is inserted as is. */
+
+:host {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset everything the host page could pass down by inheritance
+   (font, color, line-height, letter-spacing, text-align, ...). Custom
+   properties survive all:initial, so .pelican-libsoc defines every variable
+   the component uses (checked at build time). */
+.pel-root {
+  all: initial;
+  display: block;
+  width: 100%;
+  direction: ltr;
+  /* @media (max-width) of the component became @container at build time:
+     breakpoints follow the widget width, not the host viewport. */
+  container-type: inline-size;
+}
+
+/* Placeholder before the lazy mount: reserves the space (no layout shift). */
+.pel-pending {
+  display: block;
+  min-height: 720px;
+  background: #0d1014;
+}
+.pel-root[data-theme='light'] .pel-pending { background: #f7f7f4; }
+@media (prefers-color-scheme: light) {
+  .pel-root[data-theme='auto'] .pel-pending { background: #f7f7f4; }
+}
+
+/* 100vh makes sense for a full page, not for a block inside an article. */
+.pel-embed .pelican-libsoc {
+  min-height: 720px;
+  /* The blobs stay position:fixed exactly like on the full page (anchored to
+     the viewport corners while scrolling) but are clipped to the widget box:
+     clip-path, unlike overflow, also clips fixed-position descendants. */
+  clip-path: inset(0);
+  /* Nothing inside may widen the host page (no horizontal page scroll). */
+  overflow-x: clip;
+}
+
+/* Phones: the header row (logo + EN + Dark/Light) is 2 px wider than a
+   375 px container with 28 px padding. */
+@container (max-width: 400px) {
+  .pel-embed .brand-row { padding-left: 20px; padding-right: 20px; }
+}
+
+/* The header row with labels is 350 px wide after the 20 px left padding, so
+   it fits a 375 px container (a phone on libertex.org, zero gutters) as
+   before. Hosts with side gutters are narrower (fxclub.org .container keeps
+   20 px each side: a 335 px widget on a 375 px phone) and overflow-x: clip
+   used to cut the Light button. There, keep the moon/sun icons only (the
+   component's own icon-only look; both buttons keep their aria-label). */
+@container (max-width: 374px) {
+  .pel-embed .theme-seg .seg-label { display: none; }
+}
+
+/* The icon-only row still needs 288 px + 2 x 20 px padding. Narrower hosts
+   (a 320 px phone with page gutters) move the theme switch to a second line,
+   right-aligned under EN/RU, instead of clipping it. */
+@container (max-width: 327px) {
+  .pel-embed .brand-row { flex-wrap: wrap; row-gap: 10px; }
+  .pel-embed .brand-row .theme-seg { margin-left: auto; }
+}
+
+/* Background blobs, bundled as WebP (the component's url('/bg-blob*.png')
+   is rewritten to none at build time: it would hit the host's origin). */
+.pel-embed .pelican-libsoc::before { background-image: url(./assets/bg-blob.webp); }
+.pel-embed .pelican-libsoc::after { background-image: url(./assets/bg-blob2.webp); }
+.pel-root[data-blobs='off'] .pelican-libsoc::before,
+.pel-root[data-blobs='off'] .pelican-libsoc::after { display: none; }
+
+/* Safety net: never cut the Subscribe column, scroll instead. */
+.pel-embed .pelican-table { overflow-x: auto; }
+
+/* Container 1072-1079 px (fxclub.org's column is 1072 px): 24 px instead of
+   28 px side padding leaves exactly the 1022 px row + 2 px table border.
+   Narrower containers get the card rows (build-time breakpoint, 1071 px). */
+@container (min-width: 1072px) and (max-width: 1079px) {
+  .pel-embed .brand-row,
+  .pel-embed .pelican-toolbar,
+  .pel-embed .pelican-main {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* frame.html: fill the iframe until the parent helper answers, then size to
+   the content (the parent sets the iframe height). */
+.pel-root[data-frame='fixed'] .pelican-libsoc { min-height: 100vh; }
+.pel-root[data-frame='auto'] .pelican-libsoc { min-height: 720px; }
